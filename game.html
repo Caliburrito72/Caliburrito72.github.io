@@ -1,288 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>JRPG Demo — Sam</title>
-<meta name="description" content="A stylish browser JRPG demo featuring parallax scenery, an animated hero, and minimal battles.">
-<style>
-  :root{
-    --fg:#e6edf3; --muted:#b9c8d8; --ui:#0f172a; --line:#1b2433; --glow:#6ee7ff; --accent:#ff7ae6;
-  }
-  *{box-sizing:border-box}
-  body{ margin:0; font-family:Inter,system-ui,Segoe UI,Roboto; color:var(--fg); background:radial-gradient(1200px 500px at 10% -10%, #1a2454 0%, transparent 60%), linear-gradient(180deg,#0b0f1a,#0a0d18 70%); display:flex; flex-direction:column; align-items:center; min-height:100vh; }
-  header, footer{ width:100%; max-width:980px; padding:12px 16px; }
-  header a{ color:var(--fg); text-decoration:none; border:1px solid var(--line); padding:6px 10px; border-radius:10px; }
-  header a:hover{ color:var(--glow); border-color:var(--glow); }
-  .stage{ position:relative; border:1px solid var(--line); border-radius:14px; overflow:hidden; margin:10px; background:#0d1427; box-shadow: 0 30px 60px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.05); }
-  canvas{ display:block; width:min(92vw,960px); height:auto; image-rendering: pixelated; }
-  .hud{ width:min(92vw,960px); color:var(--muted); display:flex; justify-content:space-between; gap:10px; padding:4px 2px; }
-  .pill{ border:1px solid var(--line); border-radius:999px; padding:6px 10px; background:rgba(255,255,255,.05); }
-  .overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.55); }
-  .panel{ width:min(92vw,640px); background:rgba(16,23,42,.75); backdrop-filter: blur(10px); border:1px solid var(--line); border-radius:14px; padding:14px; }
-  .row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
-  button{ background:#0b1220; color:var(--fg); border:1px solid var(--line); border-radius:10px; padding:8px 12px; cursor:pointer; }
-  button:hover{ color:var(--glow); border-color:var(--glow); }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JRPG — Sam (Standalone)</title>
+  <meta name="description" content="Standalone entry for Sam's JRPG portfolio. Walk, interact, and explore the world to discover skills, art, and projects.">
+  <link rel="stylesheet" href="css/style.css" />
+  <meta name="theme-color" content="#0b0f1a" />
+  <style>
+    body{margin:0;background:#0b0f1a;color:#e6edf3;font-family:Inter,system-ui,Segoe UI,Roboto}
+  </style>
 </head>
 <body>
-<header>
-  <a href="index.html">← Back to Portfolio</a>
-</header>
-
-<div class="stage">
-  <canvas id="game" width="480" height="270"></canvas>
-</div>
-<div class="hud">
-  <div class="pill">Move: Arrows · Interact: Enter · Menu: Esc</div>
-  <div class="pill">Goal: Approach the glowing crystal</div>
-</div>
-
-<div class="overlay" id="overlay">
-  <div class="panel">
-    <h3 style="margin:0 0 8px;">Encounter</h3>
-    <div id="log" style="color:#cfe6f5;">A Shade emerges from the fog.</div>
-    <div class="row">
-      <button id="attack">Attack</button>
-      <button id="skill">Skill</button>
-      <button id="run">Run</button>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo"></div>
+      <div class="title">JRPG — Sam (Standalone)</div>
     </div>
-  </div>
-</div>
+    <div class="help"><a href="index.html" style="color:#9fb0c2;text-decoration:none;border:1px solid #1b2433;padding:4px 8px;border-radius:8px;">← Back to main</a></div>
+  </header>
 
-<footer>© 2025 Sam — JRPG Demo</footer>
+  <main class="wrap">
+    <div class="stage">
+      <canvas id="game" width="640" height="360"></canvas>
+      <div id="hint" class="hint">Explore and press E near glowing objects.</div>
+      <div id="fps" class="fps"></div>
+    </div>
+    <div id="ui-root" class="ui-root" aria-live="polite"></div>
+  </main>
 
-<script>
-/* JRPG demo with parallax, animated hero, and a minimal battle overlay.
-   Replace placeholders with Sam's art later by swapping the data URIs or file paths. */
+  <footer class="footer">© 2025 Sam · JRPG Portfolio (Standalone Entry)</footer>
 
-// Scene config
-const W = 480, H = 270, TILE = 16;
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-
-// Keys
-const keys = new Set();
-addEventListener('keydown', e => { keys.add(e.key); if (e.key==='Escape') closeOverlay(); });
-addEventListener('keyup', e => keys.delete(e.key));
-
-// Simple parallax layers (procedural)
-const layers = [
-  { speed: 0.2, draw: (t)=> drawHills('#091024','#0c1530', 0, 40, 1.2, t) },
-  { speed: 0.4, draw: (t)=> drawHills('#0c1530','#111c3d', 10, 60, 1.6, t) },
-  { speed: 0.8, draw: (t)=> drawHills('#13224f','#1a2c62', 20, 90, 2.2, t) },
-];
-
-// Map (walkable floor with blocking walls)
-const mapW = 30, mapH = 19;
-const map = [];
-for (let y=0; y<mapH; y++){
-  const row=[];
-  for (let x=0; x<mapW; x++){
-    const edge = (x===0||y===0||x===mapW-1||y===mapH-1);
-    row.push(edge ? 1 : 0);
-  }
-  map.push(row);
-}
-// add a ridge
-for (let x=6; x<22; x++) map[10][x]=1;
-
-// Hero placeholder sprite (simple 3‑frame walk) — replace with Sam's sprite sheet later.
-const hero = {
-  x: 3, y: 3, dir: 'down', frame: 0, t: 0,
-  hp: 24, maxhp: 24,
-  color: '#6ee7ff'
-};
-// Enemy and focus object
-const crystal = { x: 22, y: 13 };
-const enemy = { name:'Shade', hp: 16, maxhp: 16, alive:true };
-
-// Game loop
-let last = 0;
-function loop(ts){
-  const dt = (ts - last)/1000; last = ts;
-  update(dt, ts);
-  render(ts);
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
-
-function update(dt, ts){
-  let dx=0, dy=0;
-  if (keys.has('ArrowLeft')) dx = -1;
-  else if (keys.has('ArrowRight')) dx = 1;
-  if (keys.has('ArrowUp')) dy = -1;
-  else if (keys.has('ArrowDown')) dy = 1;
-
-  // Pace movement
-  if (dx || dy){
-    const nx = hero.x + dx, ny = hero.y + dy;
-    hero.dir = Math.abs(dx) > Math.abs(dy) ? (dx<0?'left':'right') : (dy<0?'up':'down');
-    if (walk(nx, ny)) { hero.x = nx; hero.y = ny; hero.t += dt; hero.frame = Math.floor(hero.t*8)%3; }
-  } else {
-    hero.frame = 1;
-  }
-
-  if (keys.has('Enter')) {
-    // proximity to crystal triggers encounter
-    if (Math.abs(hero.x-crystal.x)+Math.abs(hero.y-crystal.y) <= 1 && enemy.alive) openOverlay(`A ${enemy.name} emerges from the fog.`);
-  }
-}
-
-function walk(x,y){ return x>0 && y>0 && x<mapW-1 && y<mapH-1 && map[y][x]===0; }
-
-function render(ts){
-  // sky gradient
-  const g = ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0, '#0a1026'); g.addColorStop(1, '#0a0d18');
-  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
-
-  // parallax hills
-  layers.forEach((L,i)=> L.draw(ts*L.speed));
-
-  // fog
-  drawFog();
-
-  // map tiles
-  for (let y=0;y<mapH;y++){
-    for (let x=0;x<mapW;x++){
-      const sX = x*TILE, sY = y*TILE;
-      if (map[y][x]===1){
-        ctx.fillStyle = '#1b2433';
-        ctx.fillRect(sX, sY, TILE, TILE);
-        ctx.fillStyle = '#11192a';
-        ctx.fillRect(sX+4, sY+4, TILE-8, TILE-8);
-      } else {
-        ctx.fillStyle = '#0d1427';
-        ctx.fillRect(sX, sY, TILE, TILE);
-        ctx.fillStyle = 'rgba(255,255,255,0.02)';
-        ctx.fillRect(sX, sY+TILE-3, TILE, 3);
-      }
-    }
-  }
-
-  // crystal (goal)
-  pulseCrystal(crystal.x, crystal.y, ts);
-
-  // hero
-  drawHero(hero.x, hero.y, hero.dir, hero.frame);
-
-  // UI
-  drawBars();
-}
-
-function drawHills(c1, c2, yOff, amp, scale, t){
-  const h = 80;
-  const yBase = H - (h + yOff);
-  ctx.beginPath();
-  ctx.moveTo(0,H);
-  for (let x=0;x<=W;x++){
-    const y = yBase + Math.sin((x + t*0.02)*0.02*scale)*amp;
-    ctx.lineTo(x,y);
-  }
-  ctx.lineTo(W,H);
-  ctx.closePath();
-  const g = ctx.createLinearGradient(0,yBase,0,H);
-  g.addColorStop(0,c1); g.addColorStop(1,c2);
-  ctx.fillStyle = g;
-  ctx.fill();
-}
-
-function drawFog(){
-  const grd = ctx.createLinearGradient(0, H*0.5, 0, H);
-  grd.addColorStop(0,'rgba(173,216,230,0.03)');
-  grd.addColorStop(1,'rgba(173,216,230,0.12)');
-  ctx.fillStyle = grd;
-  ctx.fillRect(0,0,W,H);
-}
-
-function pulseCrystal(x,y,ts){
-  const sX = x*TILE + TILE/2, sY = y*TILE + TILE/2;
-  const r = 6 + Math.sin(ts*0.01)*2;
-  ctx.save();
-  ctx.translate(sX, sY);
-  ctx.fillStyle = '#9af0ff';
-  ctx.beginPath(); ctx.moveTo(0,-r); ctx.lineTo(r,0); ctx.lineTo(0,r); ctx.lineTo(-r,0); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = 'rgba(110,231,255,.6)'; ctx.lineWidth = 1; ctx.stroke();
-  // glow
-  ctx.fillStyle = 'rgba(110,231,255,.15)'; ctx.beginPath(); ctx.arc(0,0, r*3, 0, Math.PI*2); ctx.fill();
-  ctx.restore();
-}
-
-
-  
-function drawHero(x,y,dir,frame){
-  const sX = x*TILE, sY = y*TILE;
-  // simple silhouette with accent visor; replace this with sprite drawing.
-  ctx.save();
-  ctx.translate(sX + TILE/2, sY + TILE/2 + 1);
-  ctx.fillStyle = '#2ad3ff';
-  const bob = Math.sin(performance.now()*0.008)*1.5;
-  ctx.translate(0, bob);
-  // body
-  ctx.fillStyle = '#e6edf3';
-  ctx.fillRect(-5, -6, 10, 12);
-  // visor/accent
-  ctx.fillStyle = '#ff7ae6';
-  ctx.fillRect(-4, -4, 8, 3);
-  // direction hint
-  ctx.fillStyle = '#0b1220';
-  if (dir==='left') ctx.fillRect(-5,-1,3,2);
-  if (dir==='right') ctx.fillRect(2,-1,3,2);
-  if (dir==='up') ctx.fillRect(-1,-6,2,3);
-  if (dir==='down') ctx.fillRect(-1,3,2,3);
-  ctx.restore();
-}
-
-function drawBars(){
-  // player HP
-  const x=8, y=8, w=140, h=8;
-  ctx.fillStyle='rgba(255,255,255,.06)'; ctx.fillRect(x-1,y-1,w+2,h+2);
-  ctx.fillStyle='#1b2433'; ctx.fillRect(x,y,w,h);
-  const pct = hero.hp/hero.maxhp;
-  const g = ctx.createLinearGradient(x,y,x+w,y);
-  g.addColorStop(0,'#2ad3ff'); g.addColorStop(1,'#ff7ae6');
-  ctx.fillStyle = g; ctx.fillRect(x,y,w*pct,h);
-  ctx.fillStyle = '#b9c8d8'; ctx.fillText(`HP ${hero.hp}/${hero.maxhp}`, x, y+22);
-
-  // hint to interact near crystal
-  ctx.fillStyle = '#cfe6f5';
-  ctx.fillText('Approach the crystal and press Enter', W-240, 24);
-}
-
-// Battle overlay
-const overlay = document.getElementById('overlay');
-const log = document.getElementById('log');
-document.getElementById('attack').onclick = () => {
-  if (!enemy.alive) return;
-  const dmg = 4 + Math.floor(Math.random()*4);
-  enemy.hp = Math.max(0, enemy.hp - dmg);
-  log.textContent = `You strike for ${dmg}. ${enemy.name} ${enemy.hp}/${enemy.maxhp}.`;
-  if (enemy.hp<=0){ enemy.alive=false; log.textContent += ' Victory!'; return; }
-  enemyTurn();
-};
-document.getElementById('skill').onclick = () => {
-  if (!enemy.alive) return;
-  const dmg = 7; enemy.hp = Math.max(0, enemy.hp - dmg);
-  log.textContent = `Photon Slash deals ${dmg}. ${enemy.name} ${enemy.hp}/${enemy.maxhp}.`;
-  if (enemy.hp<=0){ enemy.alive=false; log.textContent += ' Victory!'; return; }
-  enemyTurn();
-};
-document.getElementById('run').onclick = () => closeOverlay();
-
-function enemyTurn(){
-  const dmg = 2 + Math.floor(Math.random()*3);
-  hero.hp = Math.max(0, hero.hp - dmg);
-  log.textContent += ` | ${enemy.name} hits for ${dmg}. You ${hero.hp}/${hero.maxhp}.`;
-}
-
-function openOverlay(msg){ overlay.style.display='flex'; log.textContent = msg; }
-function closeOverlay(){ overlay.style.display='none'; }
-
-// Notes for upgrading visuals:
-// - Swap drawHero() with sprite sheet rendering for polished character art.
-// - Replace parallax hills with layered art images for a bespoke look.
-// - Bring in sprite animation techniques or Phaser if desired in future.
-</script>
+  <!-- Game modules -->
+  <script src="js/ui.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>
