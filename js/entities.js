@@ -1,14 +1,27 @@
-// js/entities.js (rewritten)
-// Entities: anime‑inspired chibi player with clearer head/face/hair, 4‑frame walk, and drawing utilities.
-
+// js/entities.js (HD‑2D sprite pass: detailed chibi + simple NPCs)
 const Entities = (() => {
   const TILE = 16;
 
-  // 4‑frame cycle tuned for readability at ~8 fps walking
+  // Animation timing
   const ANIM = {
     idleFrame: 1,
-    walkFps: 8,
+    walkFps: 8,   // readable cadence
     frames: 4
+  };
+
+  // Shared palette utility (hue-shifted ramps help readability)
+  const PAL = {
+    hair: '#ff7ae6',
+    hairHi: '#ffc0f3',
+    skin: '#f1f5f9',
+    skinHi: '#ffffff',
+    outfit: '#1f2937',
+    outfitHi: '#3a4a63',
+    trim: '#93c5fd',
+    eye: '#0b1220',
+    shadowDark: '#0a1222',
+    shadowMed: '#cbd5e1',
+    boot: '#94a3b8'
   };
 
   function createPlayer({ x, y }) {
@@ -16,15 +29,18 @@ const Entities = (() => {
       x, y,
       dir: 'down',            // 'up' | 'down' | 'left' | 'right'
       frame: ANIM.idleFrame,  // 0..3
-      t: 0,                   // time accumulator for animation
-      look: { x: 0, y: 1 },   // unit vector for camera look‑ahead
-      // Palette
-      hair: '#ff7ae6',
-      skin: '#f1f5f9',
-      shadow: '#cbd5e1',
-      outfit: '#1f2937',
-      trim: '#93c5fd',
-      eye: '#0b1220'
+      t: 0,
+      look: { x: 0, y: 1 },
+      pal: { ...PAL }
+    };
+  }
+
+  function createNPC({ x, y, dir = 'down', palette = {} }) {
+    return {
+      x, y, dir,
+      frame: ANIM.idleFrame, t: 0,
+      look: { x: 0, y: 1 },
+      pal: { ...PAL, ...palette }
     };
   }
 
@@ -46,149 +62,136 @@ const Entities = (() => {
     e.t += dt;
     e.frame = Math.floor(e.t * ANIM.walkFps) % ANIM.frames;
   }
-
   function updateIdle(e, dt) {
     e.t += dt * 0.5;
     e.frame = ANIM.idleFrame;
   }
 
-  // Drawing helpers
-  function drawPlayer(ctx, e) {
+  // Public draw for player and NPCs use same renderer
+  function drawPlayer(ctx, e) { drawChibi(ctx, e); }
+  function drawNPC(ctx, e) { drawChibi(ctx, e, true); }
+
+  // Core chibi drawing
+  function drawChibi(ctx, e, slightDesat = false) {
     const cx = Math.floor(e.x);
     const cy = Math.floor(e.y);
 
-    const bob = Math.sin(performance.now() * 0.008) * 1.0;
+    const bob = Math.sin(performance.now() * 0.008) * 0.9;
+    const swing = walkSwing(e.frame);
+    const sign = swingSign(e.frame);
+
+    const pal = e.pal;
+    const outfit = slightDesat ? mix(pal.outfit, '#223046', 0.3) : pal.outfit;
+    const outfitHi = slightDesat ? mix(pal.outfitHi, '#305070', 0.3) : pal.outfitHi;
 
     ctx.save();
     ctx.translate(cx, cy + bob);
 
     // Ground shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(0, 7, 6, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 7, 6, 3, 0, 0, Math.PI * 2); ctx.fill();
 
-    // Proportions (chibi)
-    // Head: 12x12 circle‑ish, Body: 10x12 rounded rect
-    // Offsets
-    const headY = -11;
+    // Proportions: ~2.25 heads tall
+    // Head: 12x12; Body: 10x12; Legs: 4px; Arms thin
+    const headY = -12;
     const bodyY = -2;
 
-    // Body (outfit)
-    ctx.fillStyle = e.outfit;
+    // Body base
+    ctx.fillStyle = outfit;
     roundRect(ctx, -5, bodyY, 10, 12, 3, true);
 
-    // Collar/trim
-    ctx.fillStyle = e.trim;
-    ctx.fillRect(-4, bodyY + 1, 8, 2);
+    // Outfit highlight band (top-lit)
+    ctx.fillStyle = outfitHi;
+    ctx.fillRect(-4, bodyY + 2, 8, 2);
 
-    // Arms (simple swing)
-    const swing = walkSwing(e.frame);
-    ctx.fillStyle = e.outfit;
-    // left arm
-    ctx.fillRect(-6, bodyY + 2 + swing, 2, 6);
-    // right arm
-    ctx.fillRect(4, bodyY + 2 - swing, 2, 6);
+    // Arms (slight swing)
+    ctx.fillStyle = outfit;
+    ctx.fillRect(-6, bodyY + 3 + swing, 2, 6);
+    ctx.fillRect(4,  bodyY + 3 - swing, 2, 6);
 
-    // Legs with alternating step
-    ctx.fillStyle = e.shadow;
-    ctx.fillRect(-4, bodyY + 9, 3, 4);
-    ctx.fillRect(1,  bodyY + 9, 3, 4);
-    ctx.fillStyle = '#94a3b8';
-    ctx.fillRect(-4, bodyY + 11 + swingSign(e.frame), 3, 2);
-    ctx.fillRect(1,  bodyY + 11 - swingSign(e.frame), 3, 2);
+    // Legs and boots
+    ctx.fillStyle = pal.shadowMed;
+    ctx.fillRect(-4, bodyY + 10, 3, 4);
+    ctx.fillRect(1,  bodyY + 10, 3, 4);
+    ctx.fillStyle = pal.boot;
+    ctx.fillRect(-4, bodyY + 12 + sign, 3, 2);
+    ctx.fillRect(1,  bodyY + 12 - sign, 3, 2);
 
-    // Head base (skin)
-    ctx.fillStyle = e.skin;
+    // Head (skin base)
+    ctx.fillStyle = pal.skin;
     roundRect(ctx, -6, headY, 12, 12, 5, true);
 
-    // Hair silhouette (side‑swept)
-    ctx.fillStyle = e.hair;
+    // Head highlight (gives volume)
+    let grd = ctx.createLinearGradient(-6, headY, 6, headY + 12);
+    grd.addColorStop(0, 'rgba(255,255,255,0.12)');
+    grd.addColorStop(1, 'rgba(0,0,0,0.10)');
+    ctx.fillStyle = grd;
+    roundRect(ctx, -6, headY, 12, 12, 5, true);
+
+    // Hair silhouette (directional)
+    ctx.fillStyle = pal.hair;
     ctx.beginPath();
     if (e.dir === 'up') {
-      // crown heavy, fringe back
-      ctx.moveTo(-6, headY + 2);
-      ctx.bezierCurveTo(-6, headY - 6, 6, headY - 6, 6, headY + 2);
+      ctx.moveTo(-6, headY + 1);
+      ctx.bezierCurveTo(-6, headY - 6, 6, headY - 6, 6, headY + 1);
       ctx.lineTo(6, headY + 6);
       ctx.bezierCurveTo(3, headY + 3, -3, headY + 3, -6, headY + 6);
-      ctx.closePath();
     } else if (e.dir === 'down') {
-      // fringe forward
-      ctx.moveTo(-6, headY + 1);
-      ctx.bezierCurveTo(-3, headY - 3, 3, headY - 3, 6, headY + 1);
-      ctx.lineTo(6, headY + 8);
-      ctx.bezierCurveTo(2, headY + 4, -2, headY + 4, -6, headY + 8);
-      ctx.closePath();
+      ctx.moveTo(-6, headY + 2);
+      ctx.bezierCurveTo(-3, headY - 2, 3, headY - 2, 6, headY + 2);
+      ctx.lineTo(6, headY + 9);
+      ctx.bezierCurveTo(2, headY + 6, -2, headY + 6, -6, headY + 9);
     } else if (e.dir === 'left') {
       ctx.moveTo(-6, headY + 2);
-      ctx.bezierCurveTo(-8, headY - 2, 2, headY - 4, 6, headY + 2);
-      ctx.lineTo(6, headY + 9);
-      ctx.bezierCurveTo(-2, headY + 6, -6, headY + 6, -6, headY + 9);
-      ctx.closePath();
+      ctx.bezierCurveTo(-8, headY - 2, 2, headY - 3, 6, headY + 2);
+      ctx.lineTo(6, headY + 10);
+      ctx.bezierCurveTo(-1, headY + 7, -6, headY + 7, -6, headY + 10);
     } else { // right
       ctx.moveTo(-6, headY + 2);
-      ctx.bezierCurveTo(-2, headY - 4, 8, headY - 2, 6, headY + 2);
-      ctx.lineTo(6, headY + 9);
-      ctx.bezierCurveTo(6, headY + 6, 2, headY + 6, -6, headY + 9);
-      ctx.closePath();
+      ctx.bezierCurveTo(-2, headY - 3, 8, headY - 2, 6, headY + 2);
+      ctx.lineTo(6, headY + 10);
+      ctx.bezierCurveTo(6, headY + 7, 1, headY + 7, -6, headY + 10);
     }
-    ctx.fill();
+    ctx.closePath(); ctx.fill();
 
-    // Face features
+    // Hair highlight
+    ctx.fillStyle = pal.hairHi;
+    if (e.dir === 'down') ctx.fillRect(-3, headY + 1, 6, 2);
+    else if (e.dir === 'up') ctx.fillRect(-2, headY - 1, 4, 2);
+    else if (e.dir === 'left') ctx.fillRect(-4, headY + 1, 4, 2);
+    else ctx.fillRect(0, headY + 1, 4, 2);
+
+    // Face features (directional)
     drawFace(ctx, e, headY);
 
     ctx.restore();
   }
 
   function drawFace(ctx, e, headY) {
-    ctx.fillStyle = e.eye;
+    const pal = e.pal;
+    ctx.fillStyle = pal.eye;
 
     if (e.dir === 'up') {
-      // Eyes higher and closer
       dot(ctx, -2, headY + 2, 1);
       dot(ctx,  2, headY + 2, 1);
-      // No mouth visible
     } else if (e.dir === 'down') {
       dot(ctx, -2, headY + 4, 1.2);
       dot(ctx,  2, headY + 4, 1.2);
-      // small mouth
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(-1, headY + 7, 2, 1);
+      ctx.fillStyle = '#0f172a'; ctx.fillRect(-1, headY + 7, 2, 1);
     } else if (e.dir === 'left') {
       dot(ctx, -3, headY + 4, 1.2);
-      // cheek line hint
-      ctx.fillStyle = '#64748b';
-      ctx.fillRect(1, headY + 5, 2, 1);
+      ctx.fillStyle = '#64748b'; ctx.fillRect(1, headY + 5, 2, 1);
     } else { // right
-      ctx.fillStyle = e.eye;
       dot(ctx, 3, headY + 4, 1.2);
-      ctx.fillStyle = '#64748b';
-      ctx.fillRect(-3, headY + 5, 2, 1);
+      ctx.fillStyle = '#64748b'; ctx.fillRect(-3, headY + 5, 2, 1);
     }
-
-    // Simple highlight on head (gives volume)
-    const grd = ctx.createLinearGradient(-6, headY, 6, headY + 12);
-    grd.addColorStop(0, 'rgba(255,255,255,0.10)');
-    grd.addColorStop(1, 'rgba(0,0,0,0.10)');
-    ctx.fillStyle = grd;
-    roundRect(ctx, -6, headY, 12, 12, 5, true);
   }
 
   // Helpers
-  function dot(ctx, x, y, r) {
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  function walkSwing(frame) { return frame === 0 ? -1 : frame === 2 ? 1 : 0; }
+  function swingSign(frame) { return frame === 0 ? -1 : frame === 2 ? 1 : 0; }
 
-  function walkSwing(frame) {
-    // 0 1 2 3 -> -1 0 1 0 (gentle oscillation)
-    return frame === 0 ? -1 : frame === 1 ? 0 : frame === 2 ? 1 : 0;
-  }
-  function swingSign(frame) {
-    return frame === 0 ? -1 : frame === 2 ? 1 : 0;
-  }
-
+  function dot(ctx, x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
   function roundRect(ctx, x, y, w, h, r, fill = true, stroke = false) {
     const rr = Math.min(r, w / 2, h / 2);
     ctx.beginPath();
@@ -201,13 +204,27 @@ const Entities = (() => {
     if (fill) ctx.fill();
     if (stroke) ctx.stroke();
   }
+  function mix(hexA, hexB, t) {
+    const a = hexToRgb(hexA), b = hexToRgb(hexB);
+    const r = Math.round(a.r + (b.r - a.r) * t);
+    const g = Math.round(a.g + (b.g - a.g) * t);
+    const bch = Math.round(a.b + (b.b - a.b) * t);
+    return `rgb(${r},${g},${bch})`;
+  }
+  function hexToRgb(h) {
+    const s = h.startsWith('#') ? h.slice(1) : h;
+    const v = s.length === 3 ? s.split('').map(c => c + c).join('') : s;
+    const n = parseInt(v, 16);
+    return { r: (n>>16)&255, g:(n>>8)&255, b:n&255 };
+  }
 
-  // Exports
   return {
     createPlayer,
+    createNPC,
     updateFacing,
     updateWalk,
     updateIdle,
-    drawPlayer
+    drawPlayer,
+    drawNPC
   };
 })();
