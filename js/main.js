@@ -1,4 +1,4 @@
-// js/main.js (minimap fix + HD‑2D pass refinements)
+// js/main.js (props render + emissive glow + minimap sizing guard)
 (() => {
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -42,18 +42,13 @@
 
   // HUD containers
   const stage = document.querySelector('.stage');
-  // Ensure .stage is relative so absolutes anchor correctly
-  if (stage && getComputedStyle(stage).position === 'static') {
-    stage.style.position = 'relative';
-  }
+  if (stage && getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
 
-  // Minimap (fixed CSS size; internal DPR scaling)
+  // Minimap (fixed CSS size with DPR scaling)
   const mm = document.createElement('canvas');
-  const MM_CSS_W = 96; // CSS pixels
-  const MM_CSS_H = 64; // CSS pixels
+  const MM_CSS_W = 96; const MM_CSS_H = 64;
   const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
-  mm.width = MM_CSS_W * dpr;
-  mm.height = MM_CSS_H * dpr;
+  mm.width = MM_CSS_W * dpr; mm.height = MM_CSS_H * dpr;
   Object.assign(mm.style, {
     position: 'absolute', left: '12px', top: '12px',
     width: `${MM_CSS_W}px`, height: `${MM_CSS_H}px`,
@@ -62,9 +57,9 @@
   });
   stage?.appendChild(mm);
   const mmctx = mm.getContext('2d');
-  mmctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS pixels
+  mmctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // Quest chip under minimap
+  // Quest chip
   const questChip = document.createElement('div');
   Object.assign(questChip.style, {
     position: 'absolute', left: '12px', top: `${12 + MM_CSS_H + 8}px`,
@@ -75,7 +70,7 @@
   questChip.textContent = currentQuestText();
   stage?.appendChild(questChip);
 
-  // Glow buffer for emissive/bloom (offscreen, matches main canvas CSS size)
+  // Glow buffer (screen-space lightmap)
   const glow = document.createElement('canvas');
   glow.width = canvas.width; glow.height = canvas.height;
   const glowCtx = glow.getContext('2d');
@@ -197,7 +192,7 @@
 
   // Render
   function render(dt) {
-    // Background
+    // Sky/background
     const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
     g.addColorStop(0, '#0a0f24'); g.addColorStop(1, '#0b0d1a');
     ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -207,6 +202,7 @@
 
     drawParallax();
     drawMap();
+    drawProps();          // new: props with contact shadows and emissive for lamps
     Entities.drawPlayer(ctx, player);
 
     ctx.restore();
@@ -215,7 +211,6 @@
     drawMinimap();
   }
 
-  // Parallax and fog
   function drawParallax() {
     const t = performance.now() * 0.02;
     drawHills('#0b1634', '#15214a', 36, 1.4, t * 0.05);
@@ -261,23 +256,69 @@
       }
     }
 
-    // Objects + glow
+    // Interactables + glow
     for (const obj of MAP.objects) {
       const cx = obj.x * TILE + TILE / 2;
       const cy = obj.y * TILE + TILE / 2;
 
-      // ground halo
       ctx.fillStyle = 'rgba(110,231,255,0.12)';
       ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fill();
 
       drawObjectIcon(obj, cx, cy);
 
-      // glow mask (screen space relative to camera)
       const sx = Math.floor(cx - camera.x);
       const sy = Math.floor(cy - camera.y);
       const pulse = 10 + Math.sin(performance.now() * 0.005) * 2;
-      glowCtx.fillStyle = 'rgba(110,231,255,0.3)';
+      glowCtx.fillStyle = 'rgba(110,231,255,0.30)';
       glowCtx.beginPath(); glowCtx.arc(sx, sy, pulse, 0, Math.PI * 2); glowCtx.fill();
+    }
+  }
+
+  // Decorative props with contact shadows and emissive for lamps
+  function drawProps() {
+    if (!MAP.props) return;
+    for (const p of MAP.props) {
+      const x = p.x * TILE + TILE / 2;
+      const y = p.y * TILE + TILE / 2;
+
+      // Contact shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath(); ctx.ellipse(x, y + 6, 6, 3, 0, 0, Math.PI * 2); ctx.fill();
+
+      // Sprite/icon
+      if (p.type === 'lamp') {
+        // pole
+        ctx.fillStyle = '#4b5a73';
+        ctx.fillRect(x - 1, y - 10, 2, 10);
+        // head
+        ctx.fillStyle = '#6ee7ff';
+        ctx.fillRect(x - 3, y - 14, 6, 4);
+        // emissive stroke (world)
+        ctx.fillStyle = 'rgba(110,231,255,0.18)';
+        ctx.beginPath(); ctx.arc(x, y - 12, 8, 0, Math.PI * 2); ctx.fill();
+
+        // glow mask (screen space)
+        const sx = Math.floor(x - camera.x);
+        const sy = Math.floor(y - 12 - camera.y);
+        const pulse = 7 + Math.sin(performance.now() * 0.006) * 2;
+        glowCtx.fillStyle = 'rgba(110,231,255,0.28)';
+        glowCtx.beginPath(); glowCtx.arc(sx, sy, pulse, 0, Math.PI * 2); glowCtx.fill();
+
+      } else if (p.type === 'sign') {
+        ctx.fillStyle = '#8aa1c0';
+        ctx.fillRect(x - 5, y - 6, 10, 6);
+        ctx.fillStyle = '#0b1220';
+        ctx.fillRect(x - 5, y - 8, 2, 2); // post top
+      } else if (p.type === 'crate') {
+        ctx.fillStyle = '#4a3b2a';
+        ctx.fillRect(x - 6, y - 6, 12, 12);
+        ctx.strokeStyle = '#2e241a';
+        ctx.strokeRect(x - 6, y - 6, 12, 12);
+      } else if (p.type === 'plant') {
+        ctx.fillStyle = '#3aa26b';
+        ctx.beginPath(); ctx.arc(x - 2, y, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + 2, y, 3, 0, Math.PI * 2); ctx.fill();
+      }
     }
   }
 
@@ -299,8 +340,8 @@
     ctx.restore();
   }
 
+  // Glow composite (downsample blur then additive)
   function compositeGlow(dt) {
-    // downsample for blur
     const temp = document.createElement('canvas');
     temp.width = Math.floor(glow.width / 2);
     temp.height = Math.floor(glow.height / 2);
@@ -320,15 +361,14 @@
   }
 
   function drawMinimap() {
-    const scaleX = MM_CSS_W / WORLD_W;
-    const scaleY = MM_CSS_H / WORLD_H;
+    const MM_W = MM_CSS_W, MM_H = MM_CSS_H;
+    const scaleX = MM_W / WORLD_W;
+    const scaleY = MM_H / WORLD_H;
 
-    // clear bezel
-    mmctx.clearRect(0, 0, MM_CSS_W, MM_CSS_H);
+    mmctx.clearRect(0, 0, MM_W, MM_H);
     mmctx.fillStyle = 'rgba(8,12,22,0.85)';
-    mmctx.fillRect(0, 0, MM_CSS_W, MM_CSS_H);
+    mmctx.fillRect(0, 0, MM_W, MM_H);
 
-    // solids
     mmctx.fillStyle = 'rgba(27,36,51,0.95)';
     for (let y = 0; y < MAP.height; y++) {
       for (let x = 0; x < MAP.width; x++) {
@@ -339,7 +379,6 @@
       }
     }
 
-    // objects
     mmctx.fillStyle = '#6ee7ff';
     for (const obj of MAP.objects) {
       const ox = obj.x * TILE + TILE / 2;
@@ -347,11 +386,9 @@
       mmctx.fillRect(Math.floor(ox * scaleX) - 1, Math.floor(oy * scaleY) - 1, 2, 2);
     }
 
-    // player
     mmctx.fillStyle = '#ff7ae6';
     mmctx.fillRect(Math.floor(player.x * scaleX) - 2, Math.floor(player.y * scaleY) - 2, 4, 4);
 
-    // viewport
     mmctx.strokeStyle = 'rgba(207,230,245,0.85)';
     mmctx.lineWidth = 1;
     mmctx.strokeRect(Math.floor(camera.x * scaleX), Math.floor(camera.y * scaleY),
