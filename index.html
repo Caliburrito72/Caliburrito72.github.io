@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Portfolio – Sample</title>
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --fg:#e5e7eb; --muted:#9ca3af; --acc:#22d3ee; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; color:var(--fg); background:linear-gradient(180deg,#0b1220, #0f172a 30%); }
+    header { padding:48px 20px 24px; text-align:center; }
+    nav { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
+    nav a { color:var(--fg); text-decoration:none; padding:8px 12px; border:1px solid #1f2937; border-radius:8px; background:#0b1220; }
+    nav a:hover { border-color:var(--acc); color:var(--acc); }
+    .hero { padding:28px 20px 8px; text-align:center; }
+    .hero h1 { margin:0 0 8px; font-size:clamp(28px,5vw,40px); }
+    .hero p { margin:0; color:var(--muted); }
+    .container { max-width:1000px; margin:0 auto; padding:24px 20px 64px; }
+    section { margin-top:36px; }
+    h2 { margin:0 0 12px; font-size:clamp(20px,3.5vw,28px); }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
+    .card { background:rgba(17,24,39,0.7); border:1px solid #1f2937; border-radius:12px; padding:16px; backdrop-filter: blur(6px); }
+    .card h3 { margin:0 0 8px; font-size:18px; }
+    .muted { color:var(--muted); }
+    .btn { display:inline-block; margin-top:8px; padding:8px 12px; border-radius:8px; border:1px solid #1f2937; color:var(--fg); text-decoration:none; }
+    .btn:hover { color:var(--acc); border-color:var(--acc); }
+    footer { text-align:center; color:var(--muted); padding:32px 20px; border-top:1px solid #1f2937; }
+    .tag { display:inline-block; padding:2px 8px; border:1px solid #1f2937; border-radius:999px; font-size:12px; color:#cbd5e1; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="#about">About</a>
+      <a href="#projects">Projects</a>
+      <a href="#skills">Skills</a>
+      <a href="#contact">Contact</a>
+      <a href="game.html">JRPG Demo</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <h1>Hi, this is a sample Portfolio</h1>
+    <p>A clean, deploy‑ready template you can personalize and host for free.</p>
+  </div>
+
+  <main class="container">
+    <section id="about">
+      <h2>About</h2>
+      <div class="card">
+        <p class="muted">Insert a short bio, interests, or a mission statement here.</p>
+      </div>
+    </section>
+
+    <section id="projects">
+      <h2>Projects</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Project Alpha</h3>
+          <p class="muted">One‑paragraph summary of what the project does and why it matters.</p>
+          <div class="row">
+            <span class="tag">HTML</span>
+            <span class="tag">CSS</span>
+            <span class="tag">JS</span>
+          </div>
+          <a class="btn" href="#" onclick="alert('Link this to your repo or demo'); return false;">View</a>
+        </div>
+        <div class="card">
+          <h3>JRPG Demo</h3>
+          <p class="muted">A tiny browser JRPG starter—move, interact, and battle.</p>
+          <a class="btn" href="game.html">Play</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="skills">
+      <h2>Skills</h2>
+      <div class="card">
+        <div class="row">
+          <span class="tag">Web</span>
+          <span class="tag">JavaScript</span>
+          <span class="tag">UI/UX</span>
+          <span class="tag">Deploy</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact">
+      <h2>Contact</h2>
+      <div class="card">
+        <p class="muted">Email: example@domain.com • Location: Anywhere</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>© 2025 Your Name</footer>
+</body>
+</html>
