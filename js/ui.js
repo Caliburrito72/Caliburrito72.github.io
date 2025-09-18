@@ -1,11 +1,13 @@
-// js/ui.js
-// UI system: overlays, panels, dialog, prompts, and helpers for game-object interactions.
+// js/ui.js (rewritten)
+// UI system: overlays, panels, prompts anchored to world objects, quest/toast hooks.
 
 const UI = (() => {
   let root;          // #ui-root
   let overlay;       // current overlay element
   let promptEl;      // floating interaction prompt
-  let hintEl;        // bottom-left hint in index.html
+  let hintEl;        // bottom-left hint in DOM
+  let toastEl;       // transient message
+  let questEl;       // quest tracker element (text-only for now)
 
   function ensureRoot() {
     if (!root) root = document.getElementById('ui-root');
@@ -22,6 +24,29 @@ const UI = (() => {
     if (hintEl) hintEl.textContent = text;
   }
 
+  function toast(text, ms = 1800) {
+    ensureRoot();
+    if (!toastEl) {
+      toastEl = document.createElement('div');
+      toastEl.style.position = 'fixed';
+      toastEl.style.left = '50%';
+      toastEl.style.bottom = '70px';
+      toastEl.style.transform = 'translateX(-50%)';
+      toastEl.style.padding = '8px 12px';
+      toastEl.style.border = '1px solid var(--line)';
+      toastEl.style.borderRadius = '10px';
+      toastEl.style.background = 'rgba(0,0,0,.55)';
+      toastEl.style.color = '#cfe6f5';
+      toastEl.style.pointerEvents = 'none';
+      toastEl.style.zIndex = 50;
+      root.appendChild(toastEl);
+    }
+    toastEl.textContent = text;
+    toastEl.style.display = 'block';
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(() => { toastEl.style.display = 'none'; }, ms);
+  }
+
   function isOpen() {
     return !!overlay;
   }
@@ -33,25 +58,43 @@ const UI = (() => {
     }
   }
 
+  // Draw prompt above object using camera to world->screen mapping
   function showPromptAt(obj, key = 'E') {
     ensureRoot();
     if (!promptEl) {
       promptEl = document.createElement('div');
       promptEl.className = 'prompt';
-      promptEl.style.position = 'absolute';
+      promptEl.style.position = 'fixed';
       root.appendChild(promptEl);
     }
     promptEl.textContent = `Press ${key}`;
-    // Position near canvas center projection of world coords is managed by CSS absolute overlay;
-    // here we approximate by centering relative to the canvas if available.
+
     const canvas = document.getElementById('game');
-    if (!canvas) return;
+    if (!canvas || !window.__JRPG) { promptEl.style.display = 'none'; return; }
     const rect = canvas.getBoundingClientRect();
-    const px = rect.left + rect.width / 2;   // simple central hint; advanced: compute screen pos from camera
-    const py = rect.top + rect.height * 0.35;
-    promptEl.style.left = `${px}px`;
-    promptEl.style.top = `${py}px`;
-    promptEl.style.display = 'block';
+    const { camera } = window.__JRPG;
+
+    const TILE = 16;
+    // world coordinates of the object center
+    const wx = obj.x * TILE + TILE / 2;
+    const wy = obj.y * TILE + TILE / 2;
+
+    // screen coordinates relative to canvas
+    const sx = Math.round(wx - camera.x);
+    const sy = Math.round(wy - camera.y);
+
+    // place prompt slightly above the object, within canvas box
+    const px = rect.left + (sx * rect.width / canvas.width);
+    const py = rect.top + (sy * rect.height / canvas.height) - 18;
+
+    // show only if inside viewport
+    if (px < rect.left || px > rect.right || py < rect.top || py > rect.bottom) {
+      promptEl.style.display = 'none';
+    } else {
+      promptEl.style.left = `${px}px`;
+      promptEl.style.top = `${py}px`;
+      promptEl.style.display = 'block';
+    }
   }
 
   function hidePrompt() {
@@ -72,11 +115,8 @@ const UI = (() => {
     closePanel();
     overlay = document.createElement('div');
     overlay.className = 'ui-overlay';
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closePanel();
-    });
-    const panel = document.createElement('div');
-    panel.className = 'panel';
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closePanel(); });
+    const panel = document.createElement('div'); panel.className = 'panel';
     overlay.appendChild(panel);
     root.appendChild(overlay);
     return panel;
@@ -85,91 +125,36 @@ const UI = (() => {
   // Panels
   function openAbout(obj) {
     const p = makeOverlay();
-    const h = document.createElement('h3');
-    h.textContent = obj.data?.title || 'About';
-    p.appendChild(h);
-
-    const box = document.createElement('div');
-    box.className = 'dialog';
-    const portrait = document.createElement('div');
-    portrait.className = 'portrait';
-    box.appendChild(portrait);
-
-    const body = document.createElement('div');
-    body.className = 'dialog-body';
-    const name = document.createElement('div');
-    name.className = 'nameplate';
-    name.textContent = 'Sam';
-    const text = document.createElement('div');
-    text.className = 'dialog-text';
-    text.textContent = obj.data?.text || '';
-    body.appendChild(name);
-    body.appendChild(text);
-
-    // tags
-    const tags = document.createElement('div');
-    tags.className = 'row';
-    (obj.data?.tags || []).forEach(t => {
-      const span = document.createElement('span');
-      span.className = 'tag';
-      span.textContent = t;
-      tags.appendChild(span);
-    });
-    body.appendChild(tags);
-
-    box.appendChild(body);
-    p.appendChild(box);
-
-    const row = document.createElement('div');
-    row.className = 'row';
-    const closeBtn = button('Close', closePanel);
-    row.appendChild(closeBtn);
-    p.appendChild(row);
+    addHeader(p, obj.data?.title || 'About');
+    const box = row(p, 'dialog');
+    const portrait = div(box, 'portrait');
+    const body = div(box, 'dialog-body');
+    div(body, 'nameplate', 'Sam');
+    div(body, 'dialog-text', obj.data?.text || '');
+    const tags = row(body, 'row');
+    (obj.data?.tags || []).forEach(t => span(tags, 'tag', t));
+    actions(p, ['Close'], [closePanel]);
   }
 
   function openSkills(obj) {
     const p = makeOverlay();
-    const h = document.createElement('h3');
-    h.textContent = obj.data?.title || 'Skills';
-    p.appendChild(h);
-
-    const list = document.createElement('div');
-    list.className = 'row';
-    (obj.data?.skills || []).forEach(skill => {
-      const card = document.createElement('div');
-      card.className = 'card';
-      const title = document.createElement('div');
+    addHeader(p, obj.data?.title || 'Skills');
+    const list = row(p, 'row');
+    (obj.data?.skills || []).forEach(s => {
+      const card = div(list, 'card');
+      const title = div(card, '', `${s.name} — ${s.level}`);
       title.style.fontWeight = '600';
-      title.textContent = `${skill.name} — ${skill.level}`;
-      const tags = document.createElement('div');
-      tags.className = 'row';
-      (skill.tags || []).forEach(t => {
-        const span = document.createElement('span');
-        span.className = 'tag';
-        span.textContent = t;
-        tags.appendChild(span);
-      });
-      card.appendChild(title);
-      card.appendChild(tags);
-      list.appendChild(card);
+      const tags = row(card, 'row');
+      (s.tags || []).forEach(t => span(tags, 'tag', t));
     });
-    p.appendChild(list);
-
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.appendChild(button('Close', closePanel));
-    p.appendChild(row);
+    actions(p, ['Close'], [closePanel]);
   }
 
   function openGallery(obj) {
     const p = makeOverlay();
-    const h = document.createElement('h3');
-    h.textContent = obj.data?.title || 'Gallery';
-    p.appendChild(h);
-
+    addHeader(p, obj.data?.title || 'Gallery');
     (obj.data?.items || []).forEach(item => {
-      const card = document.createElement('div');
-      card.className = 'card';
+      const card = div(p, 'card');
       const img = document.createElement('img');
       img.src = item.img || '';
       img.alt = item.title || 'Artwork';
@@ -178,90 +163,53 @@ const UI = (() => {
       img.style.border = '1px solid var(--line)';
       const caption = document.createElement('p');
       caption.textContent = `${item.title || ''} — ${item.caption || ''}`;
-      card.appendChild(img);
-      card.appendChild(caption);
-      p.appendChild(card);
+      card.appendChild(img); card.appendChild(caption);
     });
-
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.appendChild(button('Close', closePanel));
-    p.appendChild(row);
+    actions(p, ['Close'], [closePanel]);
   }
 
   function openProjects(obj) {
     const p = makeOverlay();
-    const h = document.createElement('h3');
-    h.textContent = obj.data?.title || 'Projects';
-    p.appendChild(h);
-
+    addHeader(p, obj.data?.title || 'Projects');
     (obj.data?.items || []).forEach(item => {
-      const card = document.createElement('div');
-      card.className = 'card';
-      const title = document.createElement('div');
-      title.style.fontWeight = '600';
-      title.textContent = item.title || 'Project';
-      const desc = document.createElement('p');
-      desc.textContent = item.desc || '';
-      card.appendChild(title);
-      card.appendChild(desc);
+      const card = div(p, 'card');
+      const title = div(card, '', item.title || 'Project'); title.style.fontWeight = '600';
+      const desc = document.createElement('p'); desc.textContent = item.desc || ''; card.appendChild(desc);
       if (item.link) {
-        const a = document.createElement('a');
-        a.href = item.link;
-        a.textContent = 'Open';
-        a.target = '_blank';
-        a.rel = 'noopener';
-        a.className = 'tag';
-        card.appendChild(a);
+        const a = document.createElement('a'); a.href = item.link; a.target = '_blank'; a.rel='noopener';
+        a.className='tag'; a.textContent='Open'; card.appendChild(a);
       }
-      p.appendChild(card);
     });
-
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.appendChild(button('Close', closePanel));
-    p.appendChild(row);
+    actions(p, ['Close'], [closePanel]);
   }
 
   function openContact(obj) {
     const p = makeOverlay();
-    const h = document.createElement('h3');
-    h.textContent = obj.data?.title || 'Contact';
-    p.appendChild(h);
-
-    const email = document.createElement('p');
-    email.textContent = `Email: ${obj.data?.email || ''}`;
-    p.appendChild(email);
-
-    const links = document.createElement('div');
-    links.className = 'row';
+    addHeader(p, obj.data?.title || 'Contact');
+    const email = document.createElement('p'); email.textContent = `Email: ${obj.data?.email || ''}`; p.appendChild(email);
+    const links = row(p, 'row');
     (obj.data?.links || []).forEach(l => {
-      const a = document.createElement('a');
-      a.href = l.url;
-      a.textContent = l.label;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.className = 'tag';
+      const a = document.createElement('a'); a.href = l.url; a.target='_blank'; a.rel='noopener'; a.className='tag'; a.textContent=l.label;
       links.appendChild(a);
     });
-    p.appendChild(links);
-
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.appendChild(button('Close', closePanel));
-    p.appendChild(row);
+    actions(p, ['Close'], [closePanel]);
   }
 
   // Helpers
-  function button(label, onClick) {
-    const b = document.createElement('button');
-    b.textContent = label;
-    b.addEventListener('click', onClick);
-    return b;
+  function addHeader(parent, text) { const h = document.createElement('h3'); h.textContent = text; parent.appendChild(h); }
+  function row(parent, cls) { const d = document.createElement('div'); d.className = cls; parent.appendChild(d); return d; }
+  function div(parent, cls, text) { const d = document.createElement('div'); if (cls) d.className = cls; if (text) d.textContent = text; parent.appendChild(d); return d; }
+  function span(parent, cls, text) { const s = document.createElement('span'); s.className = cls; s.textContent = text; parent.appendChild(s); return s; }
+  function actions(parent, labels, handlers) {
+    const r = row(parent, 'row');
+    labels.forEach((label, i) => {
+      const b = document.createElement('button'); b.textContent = label; b.addEventListener('click', handlers[i] || (()=>{})); r.appendChild(b);
+    });
   }
 
   return {
     setHint,
+    toast,
     isOpen,
     closePanel,
     showPromptAt,
