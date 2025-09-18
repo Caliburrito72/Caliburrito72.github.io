@@ -1,5 +1,4 @@
-/* css/style.css (refined) */
-/* Theme */
+/* css/style.css (HD-2D HUD pass: minimap TL, quest chip, higher contrast) */
 :root{
   --bg1:#0b0f1a;
   --bg2:#0a0d18;
@@ -12,7 +11,6 @@
   --glass:rgba(255,255,255,.06);
 }
 
-/* Base */
 html,body{height:100%}
 body{
   margin:0;
@@ -24,7 +22,6 @@ body{
     linear-gradient(180deg,var(--bg1),var(--bg2) 70%);
 }
 
-/* Top bar */
 .topbar{
   position:sticky; top:0; z-index:20;
   display:flex; align-items:center; justify-content:space-between;
@@ -41,7 +38,6 @@ body{
 .title{ font-weight:600; letter-spacing:.2px; }
 .help{ color:var(--muted); font-size:14px; }
 
-/* Stage area */
 .wrap{ max-width:1100px; margin:0 auto; padding:16px; }
 .stage{
   position:relative;
@@ -65,10 +61,7 @@ canvas{ display:block; width:min(96vw,1000px); height:auto; image-rendering: pix
   padding:4px 8px; font-size:12px;
 }
 
-/* Minimap container sits in .stage (absolutely positioned canvas appended by main.js) */
-.stage canvas.minimap{
-  position:absolute; right:12px; top:12px; z-index:5;
-}
+/* Minimap canvas is appended dynamically; styles applied inline in JS for precise placement */
 
 /* Footer */
 .footer{
@@ -78,9 +71,7 @@ canvas{ display:block; width:min(96vw,1000px); height:auto; image-rendering: pix
 }
 
 /* UI Root and Panels */
-.ui-root{
-  position:fixed; inset:0; pointer-events:none;
-}
+.ui-root{ position:fixed; inset:0; pointer-events:none; }
 .ui-overlay{
   position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
   background:rgba(0,0,0,.55); pointer-events:auto;
@@ -116,7 +107,7 @@ button:hover{ color:var(--accent); border-color:var(--accent); }
 .nameplate{ font-weight:600; margin-bottom:4px; color:#d9e8ff; }
 .dialog-text{ color:#cfe6f5; }
 
-/* Prompt (higher contrast and slight glow) */
+/* Prompt */
 .prompt{
   position:fixed; transform: translate(-50%,-120%);
   background:rgba(10,14,28,.75);
@@ -136,7 +127,4 @@ button:hover{ color:var(--accent); border-color:var(--accent); }
   background:var(--glass); padding:10px;
 }
 
-/* Responsive tweaks */
-@media (max-width:860px){
-  .help{ display:none; }
-}
+@media (max-width:860px){ .help{ display:none; } }
