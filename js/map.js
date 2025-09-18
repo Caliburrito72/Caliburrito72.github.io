@@ -1,14 +1,12 @@
-// js/map.js (tweaked for better object visibility)
-// World grid, collision map, player spawn, and interactable objects.
-
+// js/map.js (props + natural spacing; emissives for glow buffer)
 const MAP = (() => {
   const TILE = 16;
 
-  // Map dimensions (in tiles)
+  // Dimensions
   const width = 60;
   const height = 40;
 
-  // Collision map: 0 walkable, 1 solid
+  // Collision map
   const solids = [];
   for (let y = 0; y < height; y++) {
     const row = [];
@@ -19,26 +17,23 @@ const MAP = (() => {
     solids.push(row);
   }
 
-  // Landmarks/blocks shaping the plaza
-  for (let x = 6; x < width - 6; x++) solids[18][x] = 1; // horizontal fence
-  for (let y = 8; y < 14; y++) for (let x = 10; x < 18; x++) solids[y][x] = 1; // small house block
-  for (let y = 6; y < 12; y++) for (let x = 36; x < 48; x++) solids[y][x] = 1; // gallery block (background landmark)
+  // Landmarks shaping the plaza (walkable areas are open)
+  for (let x = 6; x < width - 6; x++) solids[18][x] = 1; // fence
+  for (let y = 8; y < 14; y++) for (let x = 10; x < 18; x++) solids[y][x] = 1; // small house
+  for (let y = 6; y < 12; y++) for (let x = 36; x < 48; x++) solids[y][x] = 1; // remote block
   for (let y = 22; y < 28; y++) for (let x = 44; x < 54; x++) if ((x + y) % 2 === 0) solids[y][x] = 1; // trees
 
-  // Player spawn (pixels)
+  // Player spawn
   const playerSpawn = { x: 5 * TILE + TILE / 2, y: 20 * TILE + TILE / 2 };
 
-  // Interactables: moved Gallery near spawn; spaced others for clarity
+  // Interactables: clustered naturally near spawn but spaced
   const objects = [
-    // About (NPC Sam) — near spawn
     { id: 'about', type: 'about', name: 'Sam', x: 8, y: 20, data: {
         title: 'About Sam',
         text: 'Visual Communication student focusing on 3D stylization, lighting, and interactive narratives. Passionate about anime-inspired characters and cozy game worlds.',
         tags: ['3D Art', 'Game Art', 'Cinematics', 'Concept']
       }
     },
-
-    // Skills board — slightly to the right
     { id: 'skills', type: 'skills', name: 'Skills Board', x: 12, y: 20, data: {
         title: 'Skills',
         skills: [
@@ -50,8 +45,6 @@ const MAP = (() => {
         ]
       }
     },
-
-    // Gallery — moved near spawn for quick verification
     { id: 'gallery', type: 'gallery', name: 'Gallery', x: 10, y: 18, data: {
         title: '3D Art Gallery',
         items: [
@@ -61,8 +54,6 @@ const MAP = (() => {
         ]
       }
     },
-
-    // Projects arcade — up a bit
     { id: 'projects', type: 'projects', name: 'Arcade', x: 14, y: 16, data: {
         title: 'Projects',
         items: [
@@ -72,8 +63,6 @@ const MAP = (() => {
         ]
       }
     },
-
-    // Contact mailbox — down a bit for spacing
     { id: 'contact', type: 'contact', name: 'Mailbox', x: 10, y: 24, data: {
         title: 'Contact',
         email: 'sam@example.com',
@@ -86,5 +75,16 @@ const MAP = (() => {
     },
   ];
 
-  return { width, height, solids, playerSpawn, objects };
+  // Decorative props (rendered by main.js with glow participation)
+  // type: 'lamp' | 'sign' | 'crate' | 'plant'
+  const props = [
+    { type: 'lamp', x: 9,  y: 19, emissive: true },
+    { type: 'lamp', x: 13, y: 19, emissive: true },
+    { type: 'sign', x: 11, y: 17, text: 'Gallery →', emissive: false },
+    { type: 'crate',x: 15, y: 17, emissive: false },
+    { type: 'plant',x: 9,  y: 21, emissive: false },
+    { type: 'plant',x: 13, y: 21, emissive: false }
+  ];
+
+  return { width, height, solids, playerSpawn, objects, props };
 })();
