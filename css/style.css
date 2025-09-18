@@ -1,4 +1,4 @@
-/* css/style.css */
+/* css/style.css (refined) */
 /* Theme */
 :root{
   --bg1:#0b0f1a;
@@ -65,6 +65,11 @@ canvas{ display:block; width:min(96vw,1000px); height:auto; image-rendering: pix
   padding:4px 8px; font-size:12px;
 }
 
+/* Minimap container sits in .stage (absolutely positioned canvas appended by main.js) */
+.stage canvas.minimap{
+  position:absolute; right:12px; top:12px; z-index:5;
+}
+
 /* Footer */
 .footer{
   max-width:1100px; margin:10px auto 24px;
@@ -88,6 +93,7 @@ canvas{ display:block; width:min(96vw,1000px); height:auto; image-rendering: pix
   padding:14px;
   backdrop-filter: blur(10px);
   color:var(--fg);
+  box-shadow: 0 10px 30px rgba(0,0,0,.5);
 }
 .panel h3{ margin:0 0 8px; font-size:18px; }
 .panel p{ margin:8px 0; color:#cfe6f5; }
@@ -100,30 +106,26 @@ button{
 button:hover{ color:var(--accent); border-color:var(--accent); }
 
 /* Dialog */
-.dialog{
-  display:flex; gap:10px; align-items:flex-start;
-}
+.dialog{ display:flex; gap:10px; align-items:flex-start; }
 .portrait{
   width:72px; height:72px; border-radius:10px;
   background:linear-gradient(135deg,#223259,#40274e);
   border:1px solid var(--line);
 }
 .dialog-body{ flex:1; }
-.nameplate{
-  font-weight:600; margin-bottom:4px;
-  color:#d9e8ff;
-}
+.nameplate{ font-weight:600; margin-bottom:4px; color:#d9e8ff; }
 .dialog-text{ color:#cfe6f5; }
 
-/* Prompt */
+/* Prompt (higher contrast and slight glow) */
 .prompt{
-  position:absolute; transform: translate(-50%,-120%);
-  background:rgba(0,0,0,.5);
-  border:1px solid var(--line); color:#cfe6f5;
-  padding:2px 6px; border-radius:8px; font-size:12px;
+  position:fixed; transform: translate(-50%,-120%);
+  background:rgba(10,14,28,.75);
+  border:1px solid var(--line); color:#e6f6ff;
+  padding:2px 8px; border-radius:8px; font-size:12px;
+  box-shadow: 0 0 12px rgba(110,231,255,.25);
 }
 
-/* Tags and list styles for skill/project panels */
+/* Tags and cards */
 .tag{
   display:inline-block; font-size:12px; color:#b9c8d8;
   padding:2px 8px; border-radius:999px; border:1px solid var(--line);
