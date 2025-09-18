@@ -1,4 +1,4 @@
-// js/main.js (HD-2D pass: minimap TL, quest chip, deeper parallax/fog, glow compositing)
+// js/main.js (minimap fix + HD‑2D pass refinements)
 (() => {
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -40,28 +40,42 @@
     return q ? q.text : 'All sections explored!';
   }
 
-  // HUD: Minimap (top-left) and quest chip
-  const hud = document.querySelector('.stage');
-  const mm = document.createElement('canvas');
-  const MM_W = 96, MM_H = Math.round(MM_W * (WORLD_H / WORLD_W));
-  mm.width = MM_W; mm.height = Math.max(60, Math.min(80, MM_H));
-  Object.assign(mm.style, {
-    position: 'absolute', left: '12px', top: '12px', border: '1px solid var(--line)',
-    borderRadius: '10px', background: 'rgba(0,0,0,.35)', zIndex: 5, imageRendering: 'pixelated'
-  });
-  hud?.appendChild(mm);
-  const mmctx = mm.getContext('2d');
+  // HUD containers
+  const stage = document.querySelector('.stage');
+  // Ensure .stage is relative so absolutes anchor correctly
+  if (stage && getComputedStyle(stage).position === 'static') {
+    stage.style.position = 'relative';
+  }
 
+  // Minimap (fixed CSS size; internal DPR scaling)
+  const mm = document.createElement('canvas');
+  const MM_CSS_W = 96; // CSS pixels
+  const MM_CSS_H = 64; // CSS pixels
+  const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+  mm.width = MM_CSS_W * dpr;
+  mm.height = MM_CSS_H * dpr;
+  Object.assign(mm.style, {
+    position: 'absolute', left: '12px', top: '12px',
+    width: `${MM_CSS_W}px`, height: `${MM_CSS_H}px`,
+    border: '1px solid var(--line)', borderRadius: '10px',
+    background: 'rgba(0,0,0,.35)', zIndex: 5, imageRendering: 'pixelated'
+  });
+  stage?.appendChild(mm);
+  const mmctx = mm.getContext('2d');
+  mmctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS pixels
+
+  // Quest chip under minimap
   const questChip = document.createElement('div');
   Object.assign(questChip.style, {
-    position: 'absolute', left: '12px', top: `${12 + mm.height + 8}px`,
+    position: 'absolute', left: '12px', top: `${12 + MM_CSS_H + 8}px`,
     padding: '4px 8px', fontSize: '12px', color: '#cfe6f5',
-    background: 'rgba(0,0,0,.35)', border: '1px solid var(--line)', borderRadius: '10px', zIndex: 5
+    background: 'rgba(0,0,0,.35)', border: '1px solid var(--line)',
+    borderRadius: '10px', zIndex: 5, maxWidth: `${MM_CSS_W}px`
   });
   questChip.textContent = currentQuestText();
-  hud?.appendChild(questChip);
+  stage?.appendChild(questChip);
 
-  // Glow buffer for emissive/bloom (simple offscreen)
+  // Glow buffer for emissive/bloom (offscreen, matches main canvas CSS size)
   const glow = document.createElement('canvas');
   glow.width = canvas.width; glow.height = canvas.height;
   const glowCtx = glow.getContext('2d');
@@ -86,8 +100,8 @@
     if (fpsTimer >= 1) {
       const el = document.getElementById('fps');
       if (el) el.textContent = `${Math.round(frames / fpsTimer)} FPS`;
-      fpsTimer = 0; frames = 0;
       questChip.textContent = currentQuestText();
+      fpsTimer = 0; frames = 0;
     }
     requestAnimationFrame(loop);
   }
@@ -185,32 +199,23 @@
   function render(dt) {
     // Background
     const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    g.addColorStop(0, '#0a0f24');
-    g.addColorStop(1, '#0b0d1a');
+    g.addColorStop(0, '#0a0f24'); g.addColorStop(1, '#0b0d1a');
     ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
     ctx.translate(-Math.floor(camera.x), -Math.floor(camera.y));
 
-    // Parallax
     drawParallax();
-
-    // World
     drawMap();
-
-    // Player
     Entities.drawPlayer(ctx, player);
 
     ctx.restore();
 
-    // Glow compositing pass
     compositeGlow(dt);
-
-    // Minimap + HUD
     drawMinimap();
   }
 
-  // Parallax: richer colors and depth fog
+  // Parallax and fog
   function drawParallax() {
     const t = performance.now() * 0.02;
     drawHills('#0b1634', '#15214a', 36, 1.4, t * 0.05);
@@ -233,7 +238,6 @@
     ctx.fillStyle = g; ctx.fill();
   }
   function drawFog() {
-    // vertical fog increasing toward horizon
     const fogTop = (MAP.height * TILE) * 0.5;
     const grd = ctx.createLinearGradient(0, fogTop, 0, MAP.height * TILE);
     grd.addColorStop(0, 'rgba(173,216,230,0.04)');
@@ -242,40 +246,36 @@
     ctx.fillRect(0, 0, MAP.width * TILE, MAP.height * TILE);
   }
 
-  // Map and objects with glow mask preparation
   function drawMap() {
     for (let ty = 0; ty < MAP.height; ty++) {
       for (let tx = 0; tx < MAP.width; tx++) {
         const x = tx * TILE, y = ty * TILE;
         const solid = MAP.solids[ty][tx] === 1;
         if (solid) {
-          // wall/fence tile
           ctx.fillStyle = '#1b2433'; ctx.fillRect(x, y, TILE, TILE);
           ctx.fillStyle = '#11192a'; ctx.fillRect(x + 4, y + 4, TILE - 8, TILE - 8);
         } else {
-          // ground tile with slight highlight edge
           ctx.fillStyle = '#0e162a'; ctx.fillRect(x, y, TILE, TILE);
           ctx.fillStyle = 'rgba(255,255,255,0.025)'; ctx.fillRect(x, y + TILE - 3, TILE, 3);
         }
       }
     }
 
-    // Objects: draw + build glow mask pulses
+    // Objects + glow
     for (const obj of MAP.objects) {
       const cx = obj.x * TILE + TILE / 2;
       const cy = obj.y * TILE + TILE / 2;
 
-      // Base glow marker on world
+      // ground halo
       ctx.fillStyle = 'rgba(110,231,255,0.12)';
       ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fill();
 
-      // Icon
       drawObjectIcon(obj, cx, cy);
 
-      // Glow mask pulse (for bloom compositing)
-      const pulse = 10 + Math.sin(performance.now() * 0.005) * 2;
+      // glow mask (screen space relative to camera)
       const sx = Math.floor(cx - camera.x);
       const sy = Math.floor(cy - camera.y);
+      const pulse = 10 + Math.sin(performance.now() * 0.005) * 2;
       glowCtx.fillStyle = 'rgba(110,231,255,0.3)';
       glowCtx.beginPath(); glowCtx.arc(sx, sy, pulse, 0, Math.PI * 2); glowCtx.fill();
     }
@@ -299,9 +299,8 @@
     ctx.restore();
   }
 
-  // Simple glow composite: blur the glow buffer then draw additively
   function compositeGlow(dt) {
-    // Light blur by drawing scaled
+    // downsample for blur
     const temp = document.createElement('canvas');
     temp.width = Math.floor(glow.width / 2);
     temp.height = Math.floor(glow.height / 2);
@@ -312,24 +311,22 @@
     glowCtx.drawImage(temp, 0, 0, glow.width, glow.height);
     glowCtx.globalAlpha = 1.0;
 
-    // Additive composite to main
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.drawImage(glow, 0, 0);
     ctx.restore();
 
-    // Clear glow for next frame
     glowCtx.clearRect(0, 0, glow.width, glow.height);
   }
 
   function drawMinimap() {
-    const scaleX = mm.width / WORLD_W;
-    const scaleY = mm.height / WORLD_H;
+    const scaleX = MM_CSS_W / WORLD_W;
+    const scaleY = MM_CSS_H / WORLD_H;
 
-    mmctx.clearRect(0, 0, mm.width, mm.height);
-    // background bezel fill
-    mmctx.fillStyle = 'rgba(8,12,22,0.8)';
-    mmctx.fillRect(0, 0, mm.width, mm.height);
+    // clear bezel
+    mmctx.clearRect(0, 0, MM_CSS_W, MM_CSS_H);
+    mmctx.fillStyle = 'rgba(8,12,22,0.85)';
+    mmctx.fillRect(0, 0, MM_CSS_W, MM_CSS_H);
 
     // solids
     mmctx.fillStyle = 'rgba(27,36,51,0.95)';
@@ -354,7 +351,7 @@
     mmctx.fillStyle = '#ff7ae6';
     mmctx.fillRect(Math.floor(player.x * scaleX) - 2, Math.floor(player.y * scaleY) - 2, 4, 4);
 
-    // viewport rectangle
+    // viewport
     mmctx.strokeStyle = 'rgba(207,230,245,0.85)';
     mmctx.lineWidth = 1;
     mmctx.strokeRect(Math.floor(camera.x * scaleX), Math.floor(camera.y * scaleY),
