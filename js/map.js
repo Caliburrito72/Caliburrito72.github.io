@@ -1,12 +1,14 @@
-// js/map.js (environment color + prop density + ambient NPCs)
+// js/map.js
+// Layout plan: spawn in west plaza; to the NE are Gallery and Projects wings;
+// south has a water garden with lanterns; benches/banners/greenery frame paths.
+
 const MAP = (() => {
   const TILE = 16;
 
-  // Dimensions
   const width = 60;
   const height = 40;
 
-  // Collision map
+  // Collision silhouettes (outer ring + some blocks)
   const solids = [];
   for (let y = 0; y < height; y++) {
     const row = [];
@@ -16,21 +18,19 @@ const MAP = (() => {
     }
     solids.push(row);
   }
+  for (let x = 6; x < width - 6; x++) solids[18][x] = 1;
+  for (let y = 8; y < 14; y++) for (let x = 10; x < 18; x++) solids[y][x] = 1;
+  for (let y = 6; y < 12; y++) for (let x = 36; x < 48; x++) solids[y][x] = 1;
+  for (let y = 22; y < 28; y++) for (let x = 44; x < 54; x++) if ((x + y) % 2 === 0) solids[y][x] = 1;
 
-  // Landmark solids giving depth silhouettes
-  for (let x = 6; x < width - 6; x++) solids[18][x] = 1;                 // fence line
-  for (let y = 8; y < 14; y++) for (let x = 10; x < 18; x++) solids[y][x] = 1; // house block
-  for (let y = 6; y < 12; y++) for (let x = 36; x < 48; x++) solids[y][x] = 1; // distant block
-  for (let y = 22; y < 28; y++) for (let x = 44; x < 54; x++) if ((x + y) % 2 === 0) solids[y][x] = 1; // trees
-
-  // Player spawn
+  // Player spawn (west plaza)
   const playerSpawn = { x: 5 * TILE + TILE / 2, y: 20 * TILE + TILE / 2 };
 
-  // Interactables near spawn, spaced naturally
+  // Interactables positioned along natural paths
   const objects = [
     { id: 'about', type: 'about', name: 'Sam', x: 8, y: 20, data: {
         title: 'About Sam',
-        text: 'Visual Communication student focusing on stylized 3D and interactive narratives. Anime-inspired characters, cozy worlds, cinematic lighting.',
+        text: 'Stylized 3D + interactive narratives. Anime-inspired characters, cozy worlds, cinematic lighting.',
         tags: ['3D Art','Game Art','Cinematics','Concept']
       }
     },
@@ -75,33 +75,34 @@ const MAP = (() => {
     },
   ];
 
-  // Decorative props: more density and color variety; lamps feed glow
+  // Water garden (south)
+  const water = { rects: [ { x0: 20, y0: 26, x1: 36, y1: 30 } ] };
+
+  // Props clustering
   const props = [
-    // Plaza lamps framing the center
-    { type: 'lamp', x: 9,  y: 19, emissive: true },
-    { type: 'lamp', x: 13, y: 19, emissive: true },
-
-    // Signage guiding to panels
-    { type: 'sign', x: 11, y: 17, text: 'Gallery →', emissive: false },
-    { type: 'sign', x: 13, y: 15, text: 'Arcade ↑', emissive: false },
-
-    // Crates and planters add volume/color
-    { type: 'crate', x: 15, y: 17, emissive: false },
-    { type: 'plant', x: 9,  y: 21, emissive: false },
-    { type: 'plant', x: 13, y: 21, emissive: false },
-
-    // Banners and benches for color splashes
+    { type: 'lamp',   x: 9,  y: 19, emissive: true },
+    { type: 'lamp',   x: 13, y: 19, emissive: true },
+    { type: 'sign',   x: 11, y: 17, text: 'Gallery →' },
+    { type: 'sign',   x: 13, y: 15, text: 'Arcade ↑' },
     { type: 'banner', x: 8,  y: 18, color: '#ff7ae6' },
     { type: 'banner', x: 12, y: 18, color: '#6ee7ff' },
-    { type: 'bench',  x: 12, y: 22 }
+    { type: 'bench',  x: 12, y: 22 },
+    { type: 'crate',  x: 15, y: 17 },
+    { type: 'plant',  x: 9,  y: 21 },
+    { type: 'plant',  x: 13, y: 21 },
+    // water garden lanterns
+    { type: 'lamp',   x: 22, y: 27, emissive: true },
+    { type: 'lamp',   x: 34, y: 27, emissive: true }
   ];
 
-  // Ambient background NPCs (idle only; drawn desaturated)
+  // Ambient NPCs (background life)
   const npcs = [
     { x: 16, y: 20, dir: 'left',  palette: { hair:'#6ee7ff', outfit:'#2a3347' } },
     { x: 8,  y: 16, dir: 'down',  palette: { hair:'#ffd966', outfit:'#33405a' } },
-    { x: 14, y: 24, dir: 'right', palette: { hair:'#ff7ae6', outfit:'#2e3a51' } }
+    { x: 14, y: 24, dir: 'right', palette: { hair:'#ff7ae6', outfit:'#2e3a51' } },
+    { x: 22, y: 28, dir: 'up',    palette: { hair:'#a5f3fc', outfit:'#2b3b55' } },
+    { x: 34, y: 28, dir: 'up',    palette: { hair:'#fca5a5', outfit:'#2b3b55' } }
   ];
 
-  return { width, height, solids, playerSpawn, objects, props, npcs };
+  return { width, height, solids, playerSpawn, objects, props, npcs, water };
 })();
