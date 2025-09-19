@@ -1,8 +1,16 @@
-// js/main.js (adds water rendering: color, ripple, specular; keeps glow and props)
+// js/main.js
+// HD‑2D style pass: camera zoom, crisp rendering, layout-friendly rendering order,
+// richer ground/grass/path colors, water, props, ambient NPCs, mobile controls, and clearer structure.
+
 (() => {
+  // Canvas and context
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d', { alpha: false });
 
+  // Pixel art crispness
+  ctx.imageSmoothingEnabled = false;
+
+  // Constants
   const TILE = 16;
   const TILES_PER_SEC = 3.5;
   const SPEED = TILES_PER_SEC * TILE;
@@ -10,16 +18,36 @@
   const WORLD_W = MAP.width * TILE;
   const WORLD_H = MAP.height * TILE;
 
+  // Camera and zoom
+  // zoomScale = 1.25 draws the world larger (closer camera) while keeping crisp pixels
+  let zoomScale = 1.25;
+
+  // Resize canvas to device pixel ratio while maintaining CSS size for crisp pixels
+  function setupCanvasResolution() {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const cssW = canvas.width;
+    const cssH = canvas.height;
+    canvas.width = Math.floor(cssW * dpr);
+    canvas.height = Math.floor(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+  }
+  setupCanvasResolution();
+  addEventListener('resize', setupCanvasResolution);
+
   const camera = { x: 0, y: 0, w: canvas.width, h: canvas.height, lookAhead: 12 };
 
+  // Input (keyboard + mobile controls)
   const keys = new Set();
   addEventListener('keydown', e => { keys.add(e.key); if (e.key === 'Escape') UI.closePanel(); });
   addEventListener('keyup', e => keys.delete(e.key));
   addEventListener('blur', () => keys.clear());
 
+  // Player and ambient NPCs
   const player = Entities.createPlayer({ x: MAP.playerSpawn.x, y: MAP.playerSpawn.y });
   const ambient = (MAP.npcs || []).map(n => Entities.createNPC(n));
 
+  // Quest guide
   const QUESTS = [
     { id: 'about',   text: 'Meet Sam (About).', done: false },
     { id: 'skills',  text: 'Check the Skills Board.', done: false },
@@ -30,83 +58,183 @@
   function markQuest(id) { const q = QUESTS.find(q => q.id === id); if (q && !q.done) { q.done = true; UI.toast(`Progress: ${q.text} ✓`); } }
   function currentQuestText() { const q = QUESTS.find(q => !q.done); return q ? q.text : 'All sections explored!'; }
 
+  // HUD containers
   const stage = document.querySelector('.stage');
   if (stage && getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
 
   // Minimap (top-left fixed CSS size, DPR-aware)
   const mm = document.createElement('canvas');
   const MM_CSS_W = 96, MM_CSS_H = 64;
-  const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
-  mm.width = MM_CSS_W * dpr; mm.height = MM_CSS_H * dpr;
+  const mmDpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+  mm.width = MM_CSS_W * mmDpr; mm.height = MM_CSS_H * mmDpr;
   Object.assign(mm.style, { position:'absolute', left:'12px', top:'12px', width:`${MM_CSS_W}px`, height:`${MM_CSS_H}px`,
     border:'1px solid var(--line)', borderRadius:'10px', background:'rgba(0,0,0,.35)', zIndex:5, imageRendering:'pixelated' });
   stage?.appendChild(mm);
-  const mmctx = mm.getContext('2d'); mmctx.setTransform(dpr,0,0,dpr,0,0);
+  const mmctx = mm.getContext('2d'); mmctx.setTransform(mmDpr,0,0,mmDpr,0,0);
 
   const questChip = document.createElement('div');
   Object.assign(questChip.style, { position:'absolute', left:'12px', top:`${12+MM_CSS_H+8}px`, padding:'4px 8px', fontSize:'12px', color:'#cfe6f5',
     background:'rgba(0,0,0,.35)', border:'1px solid var(--line)', borderRadius:'10px', zIndex:5, maxWidth:`${MM_CSS_W}px` });
   questChip.textContent = currentQuestText(); stage?.appendChild(questChip);
 
-  // Glow buffer
+  // Mobile Controls: virtual joystick (left-bottom) + E button (right-bottom)
+  const touchState = { x: 0, y: 0, active: false };
+  const joy = document.createElement('div');
+  const btnE = document.createElement('button');
+
+  Object.assign(joy.style, {
+    position:'absolute', left:'12px', bottom:'12px', width:'90px', height:'90px',
+    borderRadius:'50%', border:'1px solid var(--line)', background:'rgba(0,0,0,.25)', zIndex:6, touchAction:'none'
+  });
+  Object.assign(btnE.style, {
+    position:'absolute', right:'12px', bottom:'24px', width:'60px', height:'60px',
+    borderRadius:'50%', border:'1px solid var(--line)', background:'#0b1220', color:'#e6edf3', zIndex:6
+  });
+  btnE.textContent = 'E';
+  stage?.appendChild(joy);
+  stage?.appendChild(btnE);
+
+  // Touch handlers for joystick
+  joy.addEventListener('touchstart', onTouch, { passive:false });
+  joy.addEventListener('touchmove', onTouch, { passive:false });
+  joy.addEventListener('touchend', () => { touchState.x = 0; touchState.y = 0; touchState.active = false; }, { passive:true });
+
+  function onTouch(e) {
+    const t = e.touches[0];
+    const rect = joy.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    const cy = rect.top + rect.height/2;
+    const dx = (t.clientX - cx);
+    const dy = (t.clientY - cy);
+    const r = rect.width/2 - 8;
+    const mag = Math.hypot(dx, dy);
+    const nx = (mag > r ? (dx / mag) * r : dx) / r;
+    const ny = (mag > r ? (dy / mag) * r : dy) / r;
+    touchState.x = Math.max(-1, Math.min(1, nx));
+    touchState.y = Math.max(-1, Math.min(1, ny));
+    touchState.active = true;
+    e.preventDefault();
+  }
+
+  // Touch E button to interact
+  btnE.addEventListener('touchstart', (e) => { tryInteract(); e.preventDefault(); }, { passive:false });
+
+  // Glow buffer for emissive/bloom (screen-space)
   const glow = document.createElement('canvas'); glow.width = canvas.width; glow.height = canvas.height;
   const glowCtx = glow.getContext('2d');
 
+  // Timing
   let last = performance.now(), fpsTimer = 0, frames = 0;
 
-  function init(){ UI.setHint('WASD/Arrows move · E interact · Esc close'); requestAnimationFrame(loop); }
-  function loop(ts){
-    const dt = Math.min(0.05, (ts-last)/1000); last = ts;
-    update(dt); render(dt);
-    frames++; fpsTimer+=dt;
-    if (fpsTimer >= 1){ const el=document.getElementById('fps'); if (el) el.textContent = `${Math.round(frames/fpsTimer)} FPS`; questChip.textContent = currentQuestText(); fpsTimer=0; frames=0; }
+  function init(){
+    UI.setHint('WASD/Arrows move · E interact · Esc close · Touch joystick + E on mobile');
     requestAnimationFrame(loop);
   }
 
+  function loop(ts){
+    const dt = Math.min(0.05, (ts-last)/1000); last = ts;
+    update(dt); render(dt);
+    frames++; fpsTimer += dt;
+    if (fpsTimer >= 1) {
+      const el = document.getElementById('fps');
+      if (el) el.textContent = `${Math.round(frames / fpsTimer)} FPS`;
+      questChip.textContent = currentQuestText();
+      fpsTimer = 0; frames = 0;
+    }
+    requestAnimationFrame(loop);
+  }
+
+  // Update
   function update(dt){
-    handleMovement(dt); handleInteractions(); updateCamera(dt);
+    handleMovement(dt);
+    handleInteractions();
+    updateCamera(dt);
     for (const n of ambient) Entities.updateIdle(n, dt);
   }
 
   function handleMovement(dt){
     if (UI.isOpen()) { Entities.updateIdle(player, dt); return; }
-    let x=0,y=0;
-    const L=keys.has('ArrowLeft')||keys.has('a')||keys.has('A');
-    const R=keys.has('ArrowRight')||keys.has('d')||keys.has('D');
-    const U=keys.has('ArrowUp')||keys.has('w')||keys.has('W');
-    const D=keys.has('ArrowDown')||keys.has('s')||keys.has('S');
-    if (L) x--; if (R) x++; if (U) y--; if (D) y++;
-    if (keys.has('e')||keys.has('E')||keys.has('Enter')) tryInteract();
-    if (x&&y){ x*=DIAG; y*=DIAG; }
-    const vx=x*SPEED, vy=y*SPEED; Entities.updateFacing(player,x,y);
-    if (x||y){
-      const nx=player.x+vx*dt, ny=player.y; const cx=collides(nx,ny)?player.x:nx;
-      const ny2=player.y+vy*dt; const cy=collides(cx,ny2)?player.y:ny2;
-      player.x=clamp(cx,TILE,WORLD_W-TILE); player.y=clamp(cy,TILE,WORLD_H-TILE);
-      Entities.updateWalk(player,dt);
-    } else { Entities.updateIdle(player,dt); }
+
+    // Combine keyboard + virtual joystick
+    let x = 0, y = 0;
+    const left  = keys.has('ArrowLeft') || keys.has('a') || keys.has('A');
+    const right = keys.has('ArrowRight')|| keys.has('d') || keys.has('D');
+    const up    = keys.has('ArrowUp')   || keys.has('w') || keys.has('W');
+    const down  = keys.has('ArrowDown') || keys.has('s') || keys.has('S');
+    if (left)  x -= 1;
+    if (right) x += 1;
+    if (up)    y -= 1;
+    if (down)  y += 1;
+
+    // Touch vector (joystick)
+    if (touchState.active) {
+      x += touchState.x;
+      y += touchState.y;
+    }
+
+    if (keys.has('e') || keys.has('E') || keys.has('Enter')) tryInteract();
+
+    // Normalize diagonal
+    if (x !== 0 && y !== 0) { x *= DIAG; y *= DIAG; }
+
+    const vx = x * SPEED;
+    const vy = y * SPEED;
+
+    Entities.updateFacing(player, x, y);
+
+    if (x !== 0 || y !== 0) {
+      const nx = player.x + vx * dt;
+      const ny = player.y;
+      const cx = collides(nx, ny) ? player.x : nx;
+
+      const ny2 = player.y + vy * dt;
+      const cy = collides(cx, ny2) ? player.y : ny2;
+
+      player.x = clamp(cx, TILE, WORLD_W - TILE);
+      player.y = clamp(cy, TILE, WORLD_H - TILE);
+      Entities.updateWalk(player, dt);
+    } else {
+      Entities.updateIdle(player, dt);
+    }
   }
 
   function collides(px,py){ const h=6; return isSolid(px-h,py-h)||isSolid(px+h,py-h)||isSolid(px-h,py+h)||isSolid(px+h,py+h); }
   function isSolid(px,py){ const tx=Math.floor(px/TILE), ty=Math.floor(py/TILE); if (tx<0||ty<0||tx>=MAP.width||ty>=MAP.height) return true; return MAP.solids[ty][tx]===1; }
-  function tryInteract(){ const o=nearestObject(14); if(!o) return; UI.openObject(o); markQuest(o.id); }
-  function handleInteractions(){ const o=nearestObject(14); if (o) UI.showPromptAt(o,'E'); else UI.hidePrompt(); }
-  function nearestObject(r){ let n=null,b=1e9; for(const o of MAP.objects){ const ox=o.x*TILE+TILE/2, oy=o.y*TILE+TILE/2; const d=Math.hypot(player.x-ox,player.y-oy); if(d<r&&d<b){b=d;n=o;} } return n; }
-  function updateCamera(dt){ const tx=player.x+player.look.x*camera.lookAhead-camera.w/2; const ty=player.y+player.look.y*camera.lookAhead-camera.h/2;
-    camera.x+=(tx-camera.x)*Math.min(1,dt*6); camera.y+=(ty-camera.y)*Math.min(1,dt*6);
-    camera.x=clamp(camera.x,0,Math.max(0,WORLD_W-camera.w)); camera.y=clamp(camera.y,0,Math.max(0,WORLD_H-camera.h)); }
-  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
+  function tryInteract(){ const obj=nearestObject(14); if(!obj) return; UI.openObject(obj); markQuest(obj.id); }
+  function handleInteractions(){ const obj=nearestObject(14); if (obj) UI.showPromptAt(obj,'E'); else UI.hidePrompt(); }
+  function nearestObject(r){ let n=null,b=1e9; for(const o of MAP.objects){ const ox=o.x*TILE+TILE/2, oy=o.y*TILE+TILE/2; const d=Math.hypot(player.x-ox,player.y-oy); if(d<r&&d<b){b=d;n=o;} } return n; }
+
+  function updateCamera(dt){
+    const viewW = canvas.width / zoomScale;
+    const viewH = canvas.height / zoomScale;
+
+    const targetX = player.x + player.look.x * camera.lookAhead - viewW / 2;
+    const targetY = player.y + player.look.y * camera.lookAhead - viewH / 2;
+
+    camera.x += (targetX - camera.x) * Math.min(1, dt * 6);
+    camera.y += (targetY - camera.y) * Math.min(1, dt * 6);
+
+    camera.w = viewW; camera.h = viewH;
+    camera.x = clamp(camera.x, 0, Math.max(0, WORLD_W - camera.w));
+    camera.y = clamp(camera.y, 0, Math.max(0, WORLD_H - camera.h));
+  }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+  // Render
   function render(dt){
-    // Sky
+    // Background sky
     const g=ctx.createLinearGradient(0,0,0,canvas.height); g.addColorStop(0,'#0a0f24'); g.addColorStop(1,'#0b0d1a');
     ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    ctx.save(); ctx.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+    // Zoomed world render: scale about top-left of screen; translate by camera
+    ctx.save();
+    ctx.scale(zoomScale, zoomScale);
+    ctx.translate(-Math.floor(camera.x), -Math.floor(camera.y));
 
     drawParallax();
     drawGround();
-    drawWater();      // new: shallow water band with specular/ripple
+    drawWater();
     drawProps();
     drawObjects();
     for (const n of ambient) Entities.drawNPC(ctx, n);
@@ -118,6 +246,7 @@
     drawMinimap();
   }
 
+  // Visual layers
   function drawParallax(){
     const t=performance.now()*0.02;
     drawHills('#0b1634','#15214a',36,1.4,t*0.05);
@@ -146,26 +275,32 @@
     ctx.fillStyle=grd; ctx.fillRect(0,0,MAP.width*TILE,MAP.height*TILE);
   }
 
+  // Ground with grass/path variety
   function drawGround(){
     for(let ty=0; ty<MAP.height; ty++){
       for(let tx=0; tx<MAP.width; tx++){
         const x=tx*TILE, y=ty*TILE;
         const solid = MAP.solids[ty][tx]===1;
         if (!solid) {
+          // Grass base with hue/brightness variance
           const n=(Math.sin(tx*12.9898+ty*78.233)*43758.5453)%1;
-          const c=0.08 + (n*0.04);
-          ctx.fillStyle=`rgba(${10+Math.floor(c*180)},${18+Math.floor(c*110)},${40+Math.floor(c*70)},1)`;
+          const g = 140 + Math.floor(n*25);
+          const b = 70 + Math.floor(n*20);
+          ctx.fillStyle=`rgb(${20},${g},${b})`;
           ctx.fillRect(x,y,TILE,TILE);
-          ctx.fillStyle='rgba(255,255,255,0.03)'; ctx.fillRect(x,y,TILE,2);
+
+          // Path stripes near interactables (subtle brighter edges)
+          ctx.fillStyle='rgba(255,255,255,0.035)'; ctx.fillRect(x,y,TILE,2);
+          ctx.fillStyle='rgba(0,0,0,0.035)'; ctx.fillRect(x,y+TILE-2,TILE,2);
         } else {
-          ctx.fillStyle='#1b2433'; ctx.fillRect(x,y,TILE,TILE);
-          ctx.fillStyle='#11192a'; ctx.fillRect(x+4,y+4,TILE-8,TILE-8);
+          // Walls/fence blocks
+          ctx.fillStyle='#252f44'; ctx.fillRect(x,y,TILE,TILE);
+          ctx.fillStyle='#131a2b'; ctx.fillRect(x+3,y+3,TILE-6,TILE-6);
         }
       }
     }
   }
 
-  // Water: colored base, horizontal ripple, and specular streaks for “sparkle”
   function drawWater(){
     if (!MAP.water || !MAP.water.rects) return;
     const t = performance.now()*0.0015;
@@ -173,12 +308,12 @@
       const x0=r.x0*TILE, y0=r.y0*TILE, x1=r.x1*TILE, y1=r.y1*TILE;
       const w=x1-x0, h=y1-y0;
 
-      // base water color
+      // Base gradient
       const g=ctx.createLinearGradient(0,y0,0,y1);
-      g.addColorStop(0,'#103a5a'); g.addColorStop(1,'#0a2440');
+      g.addColorStop(0,'#0f4364'); g.addColorStop(1,'#0b2a46');
       ctx.fillStyle=g; ctx.fillRect(x0,y0,w,h);
 
-      // horizontal ripple lines (subtle)
+      // Ripples
       ctx.globalAlpha = 0.12;
       ctx.fillStyle='#cfe6f5';
       for (let y=y0; y<y1; y+=4){
@@ -187,7 +322,7 @@
       }
       ctx.globalAlpha = 1.0;
 
-      // specular streaks
+      // Specular streaks
       ctx.globalAlpha = 0.10;
       ctx.fillStyle='#9adfff';
       for (let y=y0+2; y<y1; y+=6){
@@ -196,7 +331,7 @@
       }
       ctx.globalAlpha = 1.0;
 
-      // banks: a faint highlight at the edge
+      // Banks
       ctx.fillStyle='rgba(255,255,255,0.08)';
       ctx.fillRect(x0, y0, w, 2);
       ctx.fillRect(x0, y1-2, w, 2);
@@ -207,12 +342,15 @@
     if(!MAP.props) return;
     for(const p of MAP.props){
       const x=p.x*TILE + TILE/2, y=p.y*TILE + TILE/2;
+
+      // Grounding shadow
       ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(x, y+6, 6, 3, 0, 0, Math.PI*2); ctx.fill();
 
       if (p.type==='lamp'){
         ctx.fillStyle='#4b5a73'; ctx.fillRect(x-1, y-10, 2,10);
         ctx.fillStyle='#6ee7ff'; ctx.fillRect(x-3, y-14, 6,4);
         ctx.fillStyle='rgba(110,231,255,0.18)'; ctx.beginPath(); ctx.arc(x, y-12, 8, 0, Math.PI*2); ctx.fill();
+
         const sx=Math.floor(x - camera.x), sy=Math.floor(y-12 - camera.y);
         const pulse=7 + Math.sin(performance.now()*0.006)*2;
         glowCtx.fillStyle='rgba(110,231,255,0.28)'; glowCtx.beginPath(); glowCtx.arc(sx, sy, pulse, 0, Math.PI*2); glowCtx.fill();
@@ -244,8 +382,14 @@
   function drawObjects(){
     for (const obj of MAP.objects){
       const cx=obj.x*TILE + TILE/2, cy=obj.y*TILE + TILE/2;
+
+      // Ground halo
       ctx.fillStyle='rgba(110,231,255,0.12)'; ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI*2); ctx.fill();
+
+      // Icon sprite
       drawObjectIcon(obj, cx, cy);
+
+      // Glow feed
       const sx=Math.floor(cx - camera.x), sy=Math.floor(cy - camera.y);
       const pulse = 10 + Math.sin(performance.now() * 0.005) * 2;
       glowCtx.fillStyle='rgba(110,231,255,0.30)'; glowCtx.beginPath(); glowCtx.arc(sx, sy, pulse, 0, Math.PI*2); glowCtx.fill();
@@ -261,19 +405,24 @@
     ctx.restore();
   }
 
+  // Additive glow composite
   function compositeGlow(dt){
     const temp=document.createElement('canvas'); temp.width=Math.floor(glow.width/2); temp.height=Math.floor(glow.height/2);
     const tctx=temp.getContext('2d'); tctx.drawImage(glow,0,0,temp.width,temp.height);
     glowCtx.clearRect(0,0,glow.width,glow.height);
     glowCtx.globalAlpha=0.9; glowCtx.drawImage(temp,0,0,glow.width,glow.height); glowCtx.globalAlpha=1.0;
+
     ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.drawImage(glow,0,0); ctx.restore();
     glowCtx.clearRect(0,0,glow.width,glow.height);
   }
 
+  // Minimap
   function drawMinimap(){
     const MM_W=MM_CSS_W, MM_H=MM_CSS_H, scaleX=MM_W/WORLD_W, scaleY=MM_H/WORLD_H;
     mmctx.clearRect(0,0,MM_W,MM_H);
     mmctx.fillStyle='rgba(8,12,22,0.85)'; mmctx.fillRect(0,0,MM_W,MM_H);
+
+    // Solids
     mmctx.fillStyle='rgba(27,36,51,0.95)';
     for (let y=0;y<MAP.height;y++){
       for (let x=0;x<MAP.width;x++){
@@ -282,26 +431,35 @@
         }
       }
     }
-    // water hint as light stripe
+
+    // Water hint
     if (MAP.water && MAP.water.rects) {
-      mmctx.fillStyle = 'rgba(110,231,255,0.5)';
+      mmctx.fillStyle='rgba(110,231,255,0.5)';
       for (const r of MAP.water.rects){
         mmctx.fillRect(Math.floor(r.x0*TILE*scaleX), Math.floor(r.y0*TILE*scaleY),
                        Math.ceil((r.x1-r.x0)*TILE*scaleX), Math.ceil((r.y1-r.y0)*TILE*scaleY));
       }
     }
+
+    // Objects
     mmctx.fillStyle='#6ee7ff';
     for (const obj of MAP.objects){
       const ox=obj.x*TILE+TILE/2, oy=obj.y*TILE+TILE/2;
       mmctx.fillRect(Math.floor(ox*scaleX)-1, Math.floor(oy*scaleY)-1, 2, 2);
     }
+
+    // Player
     mmctx.fillStyle='#ff7ae6';
     mmctx.fillRect(Math.floor(player.x*scaleX)-2, Math.floor(player.y*scaleY)-2, 4, 4);
+
+    // Viewport
+    const viewW = camera.w, viewH = camera.h;
     mmctx.strokeStyle='rgba(207,230,245,0.85)'; mmctx.lineWidth=1;
     mmctx.strokeRect(Math.floor(camera.x*scaleX), Math.floor(camera.y*scaleY),
-                     Math.floor(camera.w*scaleX), Math.floor(camera.h*scaleY));
+                     Math.floor(viewW*scaleX), Math.floor(viewH*scaleY));
   }
 
-  window.__JRPG = { player, camera, MAP, UI, Entities };
+  // Expose
+  window.__JRPG = { player, camera, MAP, UI, Entities, setZoom(z){ zoomScale = Math.max(1, Math.min(2, z)); } };
   init();
 })();
