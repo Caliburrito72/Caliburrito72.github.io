@@ -1,29 +1,33 @@
-// js/entities.js (HD‑2D sprite pass: detailed chibi + simple NPCs)
+// js/entities.js
+// Detailed chibi characters with unique palettes, improved shading, crisp outlines,
+// small accessory for the player, and preserved API for main.js.
+
 const Entities = (() => {
   const TILE = 16;
 
-  // Animation timing
+  // Animation
   const ANIM = {
-    idleFrame: 1,
-    walkFps: 8,   // readable cadence
+    idleFrame: 1,   // 0..3
+    walkFps: 8,
     frames: 4
   };
 
-  // Shared palette utility (hue-shifted ramps help readability)
-  const PAL = {
-    hair: '#ff7ae6',
-    hairHi: '#ffc0f3',
-    skin: '#f1f5f9',
-    skinHi: '#ffffff',
-    outfit: '#1f2937',
-    outfitHi: '#3a4a63',
-    trim: '#93c5fd',
-    eye: '#0b1220',
-    shadowDark: '#0a1222',
-    shadowMed: '#cbd5e1',
-    boot: '#94a3b8'
+  // Base palettes (no pink hair by default). Each variant can be mixed per NPC.
+  const BASE_PAL = {
+    hair:    '#2b1d14', // deep brown
+    hairHi:  '#6a4a30',
+    skin:    '#f2e7da',
+    skinHi:  '#fff5ea',
+    outline: '#0b0f1a',
+    eye:     '#0c1220',
+    outfit:  '#1f2937', // charcoal navy
+    outfitHi:'#3a4a63',
+    trim:    '#9ac3ff',
+    boot:    '#8aa0b6',
+    scarf:   '#c14646'  // player accessory for uniqueness
   };
 
+  // Player factory
   function createPlayer({ x, y }) {
     return {
       x, y,
@@ -31,19 +35,24 @@ const Entities = (() => {
       frame: ANIM.idleFrame,  // 0..3
       t: 0,
       look: { x: 0, y: 1 },
-      pal: { ...PAL }
+      pal: { ...BASE_PAL },
+      accessory: 'scarf',     // small accessory to feel unique
+      name: 'Sam'
     };
   }
 
-  function createNPC({ x, y, dir = 'down', palette = {} }) {
+  // NPC factory (optional name and palette tweaks)
+  function createNPC({ x, y, dir = 'down', palette = {}, name = 'Local', dialogues = [] }) {
     return {
-      x, y, dir,
-      frame: ANIM.idleFrame, t: 0,
+      x, y, dir, frame: ANIM.idleFrame, t: 0,
       look: { x: 0, y: 1 },
-      pal: { ...PAL, ...palette }
+      pal: { ...BASE_PAL, ...palette },
+      name,
+      dialogues
     };
   }
 
+  // Facing and animation update
   function updateFacing(e, xAxis, yAxis) {
     if (Math.abs(xAxis) > Math.abs(yAxis)) {
       if (xAxis < 0) { e.dir = 'left';  e.look.x = -1; e.look.y = 0; }
@@ -57,32 +66,26 @@ const Entities = (() => {
       if (Math.hypot(e.look.x, e.look.y) < 0.1) { e.look.x = 0; e.look.y = 0; }
     }
   }
+  function updateWalk(e, dt) { e.t += dt; e.frame = Math.floor(e.t * ANIM.walkFps) % ANIM.frames; }
+  function updateIdle(e, dt) { e.t += dt * 0.5; e.frame = ANIM.idleFrame; }
 
-  function updateWalk(e, dt) {
-    e.t += dt;
-    e.frame = Math.floor(e.t * ANIM.walkFps) % ANIM.frames;
-  }
-  function updateIdle(e, dt) {
-    e.t += dt * 0.5;
-    e.frame = ANIM.idleFrame;
-  }
+  // Public draw
+  function drawPlayer(ctx, e) { drawChibi(ctx, e, false); }
+  function drawNPC(ctx, e)   { drawChibi(ctx, e, true);  } // slight desat for background
 
-  // Public draw for player and NPCs use same renderer
-  function drawPlayer(ctx, e) { drawChibi(ctx, e); }
-  function drawNPC(ctx, e) { drawChibi(ctx, e, true); }
-
-  // Core chibi drawing
-  function drawChibi(ctx, e, slightDesat = false) {
+  // Core chibi draw with improved shading and outline accents
+  function drawChibi(ctx, e, slightDesat) {
     const cx = Math.floor(e.x);
     const cy = Math.floor(e.y);
 
     const bob = Math.sin(performance.now() * 0.008) * 0.9;
-    const swing = walkSwing(e.frame);
-    const sign = swingSign(e.frame);
+    const frame = e.frame;
+    const swing = (frame === 0 ? -1 : frame === 2 ? 1 : 0);
+    const step  = swing;
 
     const pal = e.pal;
-    const outfit = slightDesat ? mix(pal.outfit, '#223046', 0.3) : pal.outfit;
-    const outfitHi = slightDesat ? mix(pal.outfitHi, '#305070', 0.3) : pal.outfitHi;
+    const tone = (hex, amt) => mix(hex, '#223', slightDesat ? amt : 0);
+    const outline = pal.outline;
 
     ctx.save();
     ctx.translate(cx, cy + bob);
@@ -91,45 +94,45 @@ const Entities = (() => {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.ellipse(0, 7, 6, 3, 0, 0, Math.PI * 2); ctx.fill();
 
-    // Proportions: ~2.25 heads tall
-    // Head: 12x12; Body: 10x12; Legs: 4px; Arms thin
+    // Proportions
+    // Head: 12x12; Body: 10x12; Legs/boots; Arms thin; Accessory
     const headY = -12;
     const bodyY = -2;
 
-    // Body base
-    ctx.fillStyle = outfit;
-    roundRect(ctx, -5, bodyY, 10, 12, 3, true);
+    // Body with shading band
+    ctx.fillStyle = tone(pal.outfit, 0.15);
+    roundRect(ctx, -5, bodyY, 10, 12, 3, true, false);
 
-    // Outfit highlight band (top-lit)
-    ctx.fillStyle = outfitHi;
+    ctx.fillStyle = tone(pal.outfitHi, 0.15);
     ctx.fillRect(-4, bodyY + 2, 8, 2);
 
-    // Arms (slight swing)
-    ctx.fillStyle = outfit;
+    // Arms (swing)
+    ctx.fillStyle = tone(pal.outfit, 0.15);
     ctx.fillRect(-6, bodyY + 3 + swing, 2, 6);
-    ctx.fillRect(4,  bodyY + 3 - swing, 2, 6);
+    ctx.fillRect( 4, bodyY + 3 - swing, 2, 6);
 
     // Legs and boots
-    ctx.fillStyle = pal.shadowMed;
+    ctx.fillStyle = '#cfd6e0';
     ctx.fillRect(-4, bodyY + 10, 3, 4);
-    ctx.fillRect(1,  bodyY + 10, 3, 4);
+    ctx.fillRect( 1, bodyY + 10, 3, 4);
+
     ctx.fillStyle = pal.boot;
-    ctx.fillRect(-4, bodyY + 12 + sign, 3, 2);
-    ctx.fillRect(1,  bodyY + 12 - sign, 3, 2);
+    ctx.fillRect(-4, bodyY + 12 + step, 3, 2);
+    ctx.fillRect( 1, bodyY + 12 - step, 3, 2);
 
-    // Head (skin base)
+    // Head base
     ctx.fillStyle = pal.skin;
-    roundRect(ctx, -6, headY, 12, 12, 5, true);
+    roundRect(ctx, -6, headY, 12, 12, 5, true, false);
 
-    // Head highlight (gives volume)
+    // Head gradient volume
     let grd = ctx.createLinearGradient(-6, headY, 6, headY + 12);
     grd.addColorStop(0, 'rgba(255,255,255,0.12)');
     grd.addColorStop(1, 'rgba(0,0,0,0.10)');
     ctx.fillStyle = grd;
-    roundRect(ctx, -6, headY, 12, 12, 5, true);
+    roundRect(ctx, -6, headY, 12, 12, 5, true, false);
 
-    // Hair silhouette (directional)
-    ctx.fillStyle = pal.hair;
+    // Hair silhouette (directional) non‑pink palette
+    ctx.fillStyle = tone(pal.hair, 0.0);
     ctx.beginPath();
     if (e.dir === 'up') {
       ctx.moveTo(-6, headY + 1);
@@ -146,7 +149,7 @@ const Entities = (() => {
       ctx.bezierCurveTo(-8, headY - 2, 2, headY - 3, 6, headY + 2);
       ctx.lineTo(6, headY + 10);
       ctx.bezierCurveTo(-1, headY + 7, -6, headY + 7, -6, headY + 10);
-    } else { // right
+    } else {
       ctx.moveTo(-6, headY + 2);
       ctx.bezierCurveTo(-2, headY - 3, 8, headY - 2, 6, headY + 2);
       ctx.lineTo(6, headY + 10);
@@ -155,14 +158,29 @@ const Entities = (() => {
     ctx.closePath(); ctx.fill();
 
     // Hair highlight
-    ctx.fillStyle = pal.hairHi;
+    ctx.fillStyle = tone(pal.hairHi, 0.0);
     if (e.dir === 'down') ctx.fillRect(-3, headY + 1, 6, 2);
     else if (e.dir === 'up') ctx.fillRect(-2, headY - 1, 4, 2);
     else if (e.dir === 'left') ctx.fillRect(-4, headY + 1, 4, 2);
     else ctx.fillRect(0, headY + 1, 4, 2);
 
-    // Face features (directional)
+    // Face features
     drawFace(ctx, e, headY);
+
+    // Accessory (player only): scarf under chin with tiny motion
+    if (e.accessory === 'scarf') {
+      const wave = Math.sin(performance.now() * 0.006) * 0.5;
+      ctx.fillStyle = pal.scarf;
+      ctx.fillRect(-3, bodyY + 0, 6, 2);
+      ctx.fillRect(2, bodyY + 1, 2, 4 + wave);
+    }
+
+    // Subtle outline accents (top-lit lighten, bottom-lined dark)
+    ctx.strokeStyle = outline;
+    ctx.globalAlpha = 0.22;
+    strokeRoundRect(ctx, -6, headY, 12, 12, 5);
+    strokeRoundRect(ctx, -5, bodyY, 10, 12, 3);
+    ctx.globalAlpha = 1.0;
 
     ctx.restore();
   }
@@ -181,17 +199,22 @@ const Entities = (() => {
     } else if (e.dir === 'left') {
       dot(ctx, -3, headY + 4, 1.2);
       ctx.fillStyle = '#64748b'; ctx.fillRect(1, headY + 5, 2, 1);
-    } else { // right
+    } else {
       dot(ctx, 3, headY + 4, 1.2);
       ctx.fillStyle = '#64748b'; ctx.fillRect(-3, headY + 5, 2, 1);
     }
+
+    // Skin highlight (subtle)
+    const skinHi = ctx.createLinearGradient(-6, headY, 6, headY + 12);
+    skinHi.addColorStop(0, 'rgba(255,255,255,0.07)');
+    skinHi.addColorStop(1, 'rgba(0,0,0,0.08)');
+    ctx.fillStyle = skinHi;
+    roundRect(ctx, -6, headY, 12, 12, 5, true, false);
   }
 
   // Helpers
-  function walkSwing(frame) { return frame === 0 ? -1 : frame === 2 ? 1 : 0; }
-  function swingSign(frame) { return frame === 0 ? -1 : frame === 2 ? 1 : 0; }
-
   function dot(ctx, x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+
   function roundRect(ctx, x, y, w, h, r, fill = true, stroke = false) {
     const rr = Math.min(r, w / 2, h / 2);
     ctx.beginPath();
@@ -204,12 +227,14 @@ const Entities = (() => {
     if (fill) ctx.fill();
     if (stroke) ctx.stroke();
   }
+  function strokeRoundRect(ctx, x, y, w, h, r) { roundRect(ctx, x, y, w, h, r, false, true); }
+
   function mix(hexA, hexB, t) {
     const a = hexToRgb(hexA), b = hexToRgb(hexB);
     const r = Math.round(a.r + (b.r - a.r) * t);
     const g = Math.round(a.g + (b.g - a.g) * t);
-    const bch = Math.round(a.b + (b.b - a.b) * t);
-    return `rgb(${r},${g},${bch})`;
+    const bl = Math.round(a.b + (b.b - a.b) * t);
+    return `rgb(${r},${g},${bl})`;
   }
   function hexToRgb(h) {
     const s = h.startsWith('#') ? h.slice(1) : h;
