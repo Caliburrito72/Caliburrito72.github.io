@@ -1,14 +1,14 @@
-// js/ui.js (rewritten)
-// UI system: overlays, panels, prompts anchored to world objects, quest/toast hooks.
+// js/ui.js
+// Overlays, object panels, anchored prompts, Dialogue UI, and robust Gallery rendering.
 
 const UI = (() => {
   let root;          // #ui-root
-  let overlay;       // current overlay element
-  let promptEl;      // floating interaction prompt
-  let hintEl;        // bottom-left hint in DOM
-  let toastEl;       // transient message
-  let questEl;       // quest tracker element (text-only for now)
+  let overlay;       // active overlay
+  let promptEl;      // floating "Press E"
+  let hintEl;        // bottom-left hint chip
+  let toastEl;       // transient toast
 
+  // Ensure a root container exists
   function ensureRoot() {
     if (!root) root = document.getElementById('ui-root');
     if (!root) {
@@ -47,18 +47,16 @@ const UI = (() => {
     toastEl._t = setTimeout(() => { toastEl.style.display = 'none'; }, ms);
   }
 
-  function isOpen() {
-    return !!overlay;
-  }
-
+  function isOpen() { return !!overlay; }
   function closePanel() {
     if (overlay) {
       overlay.remove();
       overlay = null;
+      window.removeEventListener('keydown', keyToAdvance);
     }
   }
 
-  // Draw prompt above object using camera to world->screen mapping
+  // "Press E" prompt anchored to object using camera mapping
   function showPromptAt(obj, key = 'E') {
     ensureRoot();
     if (!promptEl) {
@@ -75,19 +73,20 @@ const UI = (() => {
     const { camera } = window.__JRPG;
 
     const TILE = 16;
-    // world coordinates of the object center
+    // obj is world tile coords for interactables (x,y as tiles). For NPC prompt we pass a faux object with tile coords.
     const wx = obj.x * TILE + TILE / 2;
     const wy = obj.y * TILE + TILE / 2;
 
-    // screen coordinates relative to canvas
-    const sx = Math.round(wx - camera.x);
-    const sy = Math.round(wy - camera.y);
+    // Use current zoom to place within canvas rect correctly
+    const zoom = window.__JRPG?.setZoom ? window.__JRPG.camera.w && (canvas.width / window.__JRPG.camera.w) : 1;
 
-    // place prompt slightly above the object, within canvas box
+    // Camera-space to screen coordinates
+    const sx = Math.round((wx - camera.x) * zoom);
+    const sy = Math.round((wy - camera.y) * zoom);
+
     const px = rect.left + (sx * rect.width / canvas.width);
     const py = rect.top + (sy * rect.height / canvas.height) - 18;
 
-    // show only if inside viewport
     if (px < rect.left || px > rect.right || py < rect.top || py > rect.bottom) {
       promptEl.style.display = 'none';
     } else {
@@ -96,20 +95,9 @@ const UI = (() => {
       promptEl.style.display = 'block';
     }
   }
+  function hidePrompt(){ if (promptEl) promptEl.style.display = 'none'; }
 
-  function hidePrompt() {
-    if (promptEl) promptEl.style.display = 'none';
-  }
-
-  function openObject(obj) {
-    if (!obj || !obj.type) return;
-    if (obj.type === 'about') return openAbout(obj);
-    if (obj.type === 'skills') return openSkills(obj);
-    if (obj.type === 'gallery') return openGallery(obj);
-    if (obj.type === 'projects') return openProjects(obj);
-    if (obj.type === 'contact') return openContact(obj);
-  }
-
+  // Generic overlay builder
   function makeOverlay() {
     ensureRoot();
     closePanel();
@@ -122,7 +110,16 @@ const UI = (() => {
     return panel;
   }
 
-  // Panels
+  // Object panels
+  function openObject(obj) {
+    if (!obj || !obj.type) return;
+    if (obj.type === 'about') return openAbout(obj);
+    if (obj.type === 'skills') return openSkills(obj);
+    if (obj.type === 'gallery') return openGallery(obj);
+    if (obj.type === 'projects') return openProjects(obj);
+    if (obj.type === 'contact') return openContact(obj);
+  }
+
   function openAbout(obj) {
     const p = makeOverlay();
     addHeader(p, obj.data?.title || 'About');
@@ -130,7 +127,7 @@ const UI = (() => {
     const portrait = div(box, 'portrait');
     const body = div(box, 'dialog-body');
     div(body, 'nameplate', 'Sam');
-    div(body, 'dialog-text', obj.data?.text || '');
+    div(body, 'dialog-text', obj.data?.text || 'No profile yet.');
     const tags = row(body, 'row');
     (obj.data?.tags || []).forEach(t => span(tags, 'tag', t));
     actions(p, ['Close'], [closePanel]);
@@ -150,21 +147,43 @@ const UI = (() => {
     actions(p, ['Close'], [closePanel]);
   }
 
+  // Robust Gallery (never blank): thumbnails + caption + onerror fallback
   function openGallery(obj) {
     const p = makeOverlay();
     addHeader(p, obj.data?.title || 'Gallery');
-    (obj.data?.items || []).forEach(item => {
+
+    const items = obj.data?.items || [];
+    if (!items.length) {
+      const note = document.createElement('p');
+      note.textContent = 'No gallery items yet. Check back soon!';
+      p.appendChild(note);
+      actions(p, ['Close'], [closePanel]);
+      return;
+    }
+
+    items.forEach(item => {
       const card = div(p, 'card');
       const img = document.createElement('img');
       img.src = item.img || '';
       img.alt = item.title || 'Artwork';
+
+      // fallback on error (local placeholder)
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = 'assets/ui/placeholder.jpg';
+      };
+
       img.style.width = '100%';
       img.style.borderRadius = '8px';
       img.style.border = '1px solid var(--line)';
+
       const caption = document.createElement('p');
-      caption.textContent = `${item.title || ''} — ${item.caption || ''}`;
-      card.appendChild(img); card.appendChild(caption);
+      caption.textContent = `${item.title || 'Untitled'} — ${item.caption || ''}`;
+
+      card.appendChild(img);
+      card.appendChild(caption);
     });
+
     actions(p, ['Close'], [closePanel]);
   }
 
@@ -176,8 +195,8 @@ const UI = (() => {
       const title = div(card, '', item.title || 'Project'); title.style.fontWeight = '600';
       const desc = document.createElement('p'); desc.textContent = item.desc || ''; card.appendChild(desc);
       if (item.link) {
-        const a = document.createElement('a'); a.href = item.link; a.target = '_blank'; a.rel='noopener';
-        a.className='tag'; a.textContent='Open'; card.appendChild(a);
+        const a = document.createElement('a'); a.href = item.link; a.target = '_blank'; a.rel='noopener'; a.className='tag'; a.textContent='Open';
+        card.appendChild(a);
       }
     });
     actions(p, ['Close'], [closePanel]);
@@ -195,7 +214,61 @@ const UI = (() => {
     actions(p, ['Close'], [closePanel]);
   }
 
-  // Helpers
+  // Dialogue overlay (speaker name + line-by-line with Next/Close)
+  function openDialogue({ name = 'Local', lines = [] }) {
+    const p = makeOverlay();
+    addHeader(p, 'Conversation');
+
+    const box = row(p, 'dialog');
+    const portrait = div(box, 'portrait'); // can be styled or replaced later with avatar canvas
+    const body = div(box, 'dialog-body');
+
+    const nameplate = div(body, 'nameplate', name);
+    const lineEl = div(body, 'dialog-text', '');
+
+    let idx = 0;
+    function renderLine() {
+      if (idx >= lines.length) { closePanel(); return; }
+      typeText(lineEl, lines[idx], 18); // 18ms per char
+      idx++;
+      updateButtons();
+    }
+
+    function typeText(el, text, ms) {
+      el.textContent = '';
+      let i = 0;
+      clearInterval(el._t);
+      el._t = setInterval(() => {
+        el.textContent = text.slice(0, i++);
+        if (i > text.length) { clearInterval(el._t); }
+      }, ms);
+    }
+
+    const btnRow = row(body, 'row');
+    const nextBtn = document.createElement('button');
+    const closeBtn = document.createElement('button');
+    nextBtn.textContent = 'Next';
+    closeBtn.textContent = 'Close';
+    btnRow.appendChild(nextBtn); btnRow.appendChild(closeBtn);
+
+    function updateButtons() {
+      nextBtn.style.display = idx < lines.length ? 'inline-block' : 'none';
+    }
+
+    function keyToAdvance(e) {
+      if (!overlay) return;
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); renderLine(); }
+      if (e.key === 'Escape') closePanel();
+    }
+
+    nextBtn.addEventListener('click', renderLine);
+    closeBtn.addEventListener('click', closePanel);
+    window.addEventListener('keydown', keyToAdvance);
+
+    renderLine();
+  }
+
+  // DOM helpers
   function addHeader(parent, text) { const h = document.createElement('h3'); h.textContent = text; parent.appendChild(h); }
   function row(parent, cls) { const d = document.createElement('div'); d.className = cls; parent.appendChild(d); return d; }
   function div(parent, cls, text) { const d = document.createElement('div'); if (cls) d.className = cls; if (text) d.textContent = text; parent.appendChild(d); return d; }
@@ -207,13 +280,5 @@ const UI = (() => {
     });
   }
 
-  return {
-    setHint,
-    toast,
-    isOpen,
-    closePanel,
-    showPromptAt,
-    hidePrompt,
-    openObject
-  };
+  return { setHint, toast, isOpen, closePanel, showPromptAt, hidePrompt, openObject, openDialogue };
 })();
