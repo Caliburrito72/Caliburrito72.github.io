@@ -1,54 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sam — JRPG Portfolio · WASD + E</title>
-  <meta name="description" content="A playable JRPG portfolio: explore a cozy plaza, interact with objects, and discover skills, art, projects, and contact." />
-  <link rel="preload" href="css/style.css" as="style" />
-  <link rel="stylesheet" href="css/style.css" />
-  <link rel="preload" href="js/ui.js" as="script" />
-  <link rel="preload" href="js/map.js" as="script" />
-  <link rel="preload" href="js/entities.js" as="script" />
-  <link rel="preload" href="js/main.js" as="script" />
-  <meta name="theme-color" content="#0b0f1a" />
-  <style>
-    body{margin:0;background:#0b0f1a;color:#e6edf3;font-family:Inter,system-ui,Segoe UI,Roboto}
-    .noscript{max-width:760px;margin:24px auto;padding:16px;border:1px solid #25304a;border-radius:12px;background:#0f172a}
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Visual Communication Portfolio</title>
+    <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo"></div>
-      <div class="title">Sam — JRPG Portfolio</div>
-    </div>
-    <div class="help">WASD/Arrows move · E interact · Esc close</div>
-  </header>
+    <header>
+        <div class="logo">Your Name</div>
+        <nav>
+            <ul>
+                <li><a href="#paintings">Paintings</a></li>
+                <li><a href="#sketches">Sketches</a></li>
+                <li><a href="#3d-work">3D Work</a></li>
+                <li><a href="#short-films">Short Films</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
 
-  <main class="wrap">
-    <div class="stage">
-      <canvas id="game" width="640" height="360"></canvas>
-      <div id="hint" class="hint">Explore glowing icons and press E to open panels.</div>
-      <div id="fps" class="fps"></div>
-    </div>
-    <div id="ui-root" class="ui-root" aria-live="polite"></div>
-  </main>
+    <main>
+        <section id="intro">
+            <h1>Welcome to My Creative Portfolio</h1>
+            <p>Showcasing paintings, sketches, 3D works, and short films. Explore and enjoy!</p>
+        </section>
 
-  <footer class="footer">
-    © 2025 Sam · A Visual Communication student portfolio, reimagined as a JRPG.
-  </footer>
+        <section id="paintings" class="gallery-section">
+            <h2>Paintings</h2>
+            <div class="gallery-grid">
+                <div class="placeholder">Painting 1</div>
+                <div class="placeholder">Painting 2</div>
+                <div class="placeholder">Painting 3</div>
+            </div>
+        </section>
 
-  <noscript>
-    <div class="noscript">
-      This site is a playable JRPG that needs JavaScript enabled. Please enable JavaScript to explore the portfolio world.
-    </div>
-  </noscript>
+        <section id="sketches" class="gallery-section">
+            <h2>Sketches</h2>
+            <div class="gallery-grid">
+                <div class="placeholder">Sketch 1</div>
+                <div class="placeholder">Sketch 2</div>
+                <div class="placeholder">Sketch 3</div>
+            </div>
+        </section>
 
-  <!-- Load order: UI → MAP → Entities → Main (ensures globals exist before boot) -->
-  <script src="js/ui.js"></script>
-  <script src="js/map.js"></script>
-  <script src="js/entities.js"></script>
-  <script src="js/main.js"></script>
+        <section id="3d-work" class="gallery-section">
+            <h2>3D Work</h2>
+            <div class="gallery-grid">
+                <div class="placeholder">3D Model 1</div>
+                <div class="placeholder">3D Model 2</div>
+                <div class="placeholder">3D Model 3</div>
+            </div>
+        </section>
+
+        <section id="short-films" class="gallery-section">
+            <h2>Short Films</h2>
+            <div class="gallery-grid">
+                <div class="placeholder">Short Film 1</div>
+                <div class="placeholder">Short Film 2</div>
+                <div class="placeholder">Short Film 3</div>
+            </div>
+        </section>
+
+        <section id="contact" class="contact-section">
+            <h2>Contact</h2>
+            <p>Email: your.email@example.com</p>
+            <p>Socials: [Insert Social Media Links]</p>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Your Name. All rights reserved.</p>
+    </footer>
 </body>
 </html>
