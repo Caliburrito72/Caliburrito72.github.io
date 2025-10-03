@@ -65,4 +65,8 @@ p {
 .portfolio-game:hover {
     background-color: #0097a7;
 }
+.btn.clicked {
+    transform: scale(0.95);
+    transition: transform 0.1s ease-in-out;
+}
 
