@@ -1,34 +1,35 @@
 // Wait for DOM to load
 document.addEventListener('DOMContentLoaded', () => {
-    const buttons = document.querySelectorAll('.btn');
+  const buttons = document.querySelectorAll('.btn');
 
-    // Add click feedback animation
-    buttons.forEach(button => {
-        button.addEventListener('click', () => {
-            button.classList.add('clicked');
-            setTimeout(() => {
-                button.classList.remove('clicked');
-            }, 200);
-        });
+  // Add click feedback animation
+  buttons.forEach(button => {
+    button.addEventListener('click', () => {
+      button.classList.add('clicked');
+      setTimeout(() => {
+        button.classList.remove('clicked');
+      }, 200);
     });
+  });
 
-    // Keyboard accessibility on Enter key
-    buttons.forEach(button => {
-        button.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                button.click();
-            }
-        });
+  // Keyboard accessibility on Enter key and Space key
+  buttons.forEach(button => {
+    button.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        button.click();
+      }
     });
+  });
 });
 
 function goToEasyTour() {
-    // Navigate to main portfolio site (index.html)
-    window.location.href = 'index.html';
+  // Navigate to main portfolio site (portfolio.html)
+  window.location.href = 'portfolio.html';
 }
 
 function goToPortfolioGame() {
-    // Placeholder URL for the portfolio game - replace with actual link later
-    window.location.href = 'https://your-portfolio-game-link.com';
+  // Replace with your actual portfolio game URL when ready
+  window.location.href = 'https://your-portfolio-game-link.com';
 }
+
