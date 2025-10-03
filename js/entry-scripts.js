@@ -22,3 +22,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+function goToEasyTour() {
+    // Navigate to main portfolio site (index.html)
+    window.location.href = 'index.html';
+}
+
+function goToPortfolioGame() {
+    // Placeholder URL for the portfolio game - replace with actual link later
+    window.location.href = 'https://your-portfolio-game-link.com';
+}
