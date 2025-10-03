@@ -123,3 +123,17 @@ footer {
         gap: 0.75rem;
     }
 }
+/* existing styles above */
+
+.back-entry-link,
+.back-entry-link-footer {
+    color: #e91e63;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.back-entry-link:hover,
+.back-entry-link-footer:hover {
+    text-decoration: underline;
+}
+
