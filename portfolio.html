@@ -3,77 +3,214 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Visual Communication Portfolio</title>
+  <title>Portfolio • Visual Communication</title>
   <link rel="stylesheet" href="css/styles.css" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="description" content="Paintings, sketches, 3D work, and short films presented with smooth interactions and refined design." />
 </head>
 <body>
-  <header>
-    <div class="logo">Your Name</div>
-    <nav>
+
+  <!-- Loading overlay -->
+  <div id="app-loader" class="loader hidden" aria-hidden="true" aria-live="polite">
+    <div class="spinner" role="status" aria-label="Loading"></div>
+  </div>
+
+  <!-- Site shell -->
+  <header class="site-header">
+    <a class="logo" href="index.html" data-vt>VisualComm</a>
+    <nav class="main-nav" aria-label="Primary">
       <ul>
-        <li><a href="index.html">Back to Entry Screen</a></li>
-        <li><a href="#paintings">Paintings</a></li>
-        <li><a href="#sketches">Sketches</a></li>
-        <li><a href="#3d-work">3D Work</a></li>
-        <li><a href="#short-films">Short Films</a></li>
-        <li><a href="#contact">Contact</a></li>
+        <li><a href="index.html" data-vt>Back to Entry</a></li>
+        <li><a href="#paintings" class="scrollto">Paintings</a></li>
+        <li><a href="#sketches" class="scrollto">Sketches</a></li>
+        <li><a href="#work3d" class="scrollto">3D Work</a></li>
+        <li><a href="#films" class="scrollto">Short Films</a></li>
+        <li><a href="#contact" class="scrollto">Contact</a></li>
       </ul>
     </nav>
   </header>
 
-  <main>
-    <section id="intro">
-      <h1>Welcome to My Creative Portfolio</h1>
-      <p>Showcasing paintings, sketches, 3D works, and short films. Explore and enjoy!</p>
-      <p><a href="index.html" class="back-entry-link">Back to Entry Screen</a></p>
-    </section>
-
-    <section id="paintings" class="gallery-section">
-      <h2>Paintings</h2>
-      <div class="gallery-grid">
-        <div class="placeholder">Painting 1</div>
-        <div class="placeholder">Painting 2</div>
-        <div class="placeholder">Painting 3</div>
+  <!-- Hero -->
+  <section class="hero reveal" id="top">
+    <div class="hero-inner">
+      <h1 class="fx-underline">A curated blend of art and motion</h1>
+      <p>Paintings, sketches, 3D experiments, and short films—crafted with intent, presented with polish.</p>
+      <div class="hero-cta">
+        <a href="#paintings" class="btn-primary scrollto">Start exploring</a>
+        <a href="index.html" class="btn-ghost" data-vt>Entry screen</a>
       </div>
-    </section>
+    </div>
+    <div class="hero-badge">Portfolio 2025</div>
+  </section>
 
-    <section id="sketches" class="gallery-section">
-      <h2>Sketches</h2>
-      <div class="gallery-grid">
-        <div class="placeholder">Sketch 1</div>
-        <div class="placeholder">Sketch 2</div>
-        <div class="placeholder">Sketch 3</div>
-      </div>
-    </section>
+  <!-- Paintings -->
+  <section class="section reveal" id="paintings" aria-labelledby="paintings-title">
+    <div class="section-head">
+      <h2 id="paintings-title" class="fx-underline">Paintings</h2>
+      <p>Expressive color studies and narrative canvases.</p>
+    </div>
+    <div class="grid gallery">
+      <!-- Card -->
+      <article class="card" tabindex="0" data-modal="img" data-src="assets/images/painting-1.jpg" data-alt="Painting 1">
+        <div class="media">
+          <img src="assets/images/placeholder-wide.jpg" alt="Painting 1 placeholder" loading="lazy" />
+          <div class="overlay">
+            <span>View</span>
+          </div>
+        </div>
+        <h3>Untitled Spectrum</h3>
+        <p>Oil on canvas, 2025</p>
+      </article>
 
-    <section id="3d-work" class="gallery-section">
-      <h2>3D Work</h2>
-      <div class="gallery-grid">
-        <div class="placeholder">3D Model 1</div>
-        <div class="placeholder">3D Model 2</div>
-        <div class="placeholder">3D Model 3</div>
-      </div>
-    </section>
+      <article class="card" tabindex="0" data-modal="img" data-src="assets/images/painting-2.jpg" data-alt="Painting 2">
+        <div class="media">
+          <img src="assets/images/placeholder-wide.jpg" alt="Painting 2 placeholder" loading="lazy" />
+          <div class="overlay"><span>View</span></div>
+        </div>
+        <h3>Twilight Field</h3>
+        <p>Acrylic, 2025</p>
+      </article>
 
-    <section id="short-films" class="gallery-section">
-      <h2>Short Films</h2>
-      <div class="gallery-grid">
-        <div class="placeholder">Short Film 1</div>
-        <div class="placeholder">Short Film 2</div>
-        <div class="placeholder">Short Film 3</div>
-      </div>
-    </section>
+      <article class="card" tabindex="0" data-modal="img" data-src="assets/images/painting-3.jpg" data-alt="Painting 3">
+        <div class="media">
+          <img src="assets/images/placeholder-wide.jpg" alt="Painting 3 placeholder" loading="lazy" />
+          <div class="overlay"><span>View</span></div>
+        </div>
+        <h3>City Quiet</h3>
+        <p>Mixed media, 2025</p>
+      </article>
+    </div>
+  </section>
 
-    <section id="contact" class="contact-section">
-      <h2>Contact</h2>
-      <p>Email: your.email@example.com</p>
-      <p>Socials: [Insert Social Media Links]</p>
-    </section>
-  </main>
+  <!-- Sketches -->
+  <section class="section alt reveal" id="sketches" aria-labelledby="sketches-title">
+    <div class="section-head">
+      <h2 id="sketches-title" class="fx-underline">Sketches</h2>
+      <p>Rapid linework, character studies, and ideation.</p>
+    </div>
+    <div class="grid gallery">
+      <article class="card" tabindex="0" data-modal="img" data-src="assets/images/sketch-1.jpg" data-alt="Sketch 1">
+        <div class="media">
+          <img src="assets/images/placeholder-tall.jpg" alt="Sketch 1 placeholder" loading="lazy" />
+          <div class="overlay"><span>View</span></div>
+        </div>
+        <h3>Gesture Set</h3>
+        <p>Graphite, 2025</p>
+      </article>
 
-  <footer>
-    <p>&copy; 2025 Your Name. All rights reserved.</p>
-    <p><a href="index.html" class="back-entry-link-footer">Back to Entry Screen</a></p>
+      <article class="card" tabindex="0" data-modal="img" data-src="assets/images/sketch-2.jpg" data-alt="Sketch 2">
+        <div class="media">
+          <img src="assets/images/placeholder-tall.jpg" alt="Sketch 2 placeholder" loading="lazy" />
+          <div class="overlay"><span>View</span></div>
+        </div>
+        <h3>Character Notes</h3>
+        <p>Ink, 2025</p>
+      </article>
+
+      <article class="card" tabindex="0" data-modal="img" data-src="assets/images/sketch-3.jpg" data-alt="Sketch 3">
+        <div class="media">
+          <img src="assets/images/placeholder-tall.jpg" alt="Sketch 3 placeholder" loading="lazy" />
+          <div class="overlay"><span>View</span></div>
+        </div>
+        <h3>Architecture Study</h3>
+        <p>Pen, 2025</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- 3D Work -->
+  <section class="section reveal" id="work3d" aria-labelledby="work3d-title">
+    <div class="section-head">
+      <h2 id="work3d-title" class="fx-underline">3D Work</h2>
+      <p>Concept models and materials explorations.</p>
+    </div>
+    <div class="grid gallery">
+      <article class="card" tabindex="0" data-modal="img" data-src="assets/images/3d-1.jpg" data-alt="3D Work 1">
+        <div class="media">
+          <img src="assets/images/placeholder-wide.jpg" alt="3D 1 placeholder" loading="lazy" />
+          <div class="overlay"><span>View</span></div>
+        </div>
+        <h3>Poly Study</h3>
+        <p>Blender, 2025</p>
+      </article>
+
+      <article class="card" tabindex="0" data-modal="img" data-src="assets/images/3d-2.jpg" data-alt="3D Work 2">
+        <div class="media">
+          <img src="assets/images/placeholder-wide.jpg" alt="3D 2 placeholder" loading="lazy" />
+          <div class="overlay"><span>View</span></div>
+        </div>
+        <h3>Material Lab</h3>
+        <p>Substance, 2025</p>
+      </article>
+
+      <article class="card" tabindex="0" data-modal="img" data-src="assets/images/3d-3.jpg" data-alt="3D Work 3">
+        <div class="media">
+          <img src="assets/images/placeholder-wide.jpg" alt="3D 3 placeholder" loading="lazy" />
+          <div class="overlay"><span>View</span></div>
+        </div>
+        <h3>Hard Surface</h3>
+        <p>Fusion 360, 2025</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Short Films -->
+  <section class="section alt reveal" id="films" aria-labelledby="films-title">
+    <div class="section-head">
+      <h2 id="films-title" class="fx-underline">Short Films</h2>
+      <p>Compact narratives and motion studies.</p>
+    </div>
+    <div class="grid gallery">
+      <article class="card" tabindex="0" data-modal="video" data-src="assets/videos/film-1.mp4" data-alt="Short Film 1">
+        <div class="media">
+          <img src="assets/images/placeholder-wide.jpg" alt="Film 1 thumbnail" loading="lazy" />
+          <div class="overlay"><span>Play</span></div>
+        </div>
+        <h3>Quiet Hour</h3>
+        <p>2:12 • 2025</p>
+      </article>
+
+      <article class="card" tabindex="0" data-modal="video" data-src="assets/videos/film-2.mp4" data-alt="Short Film 2">
+        <div class="media">
+          <img src="assets/images/placeholder-wide.jpg" alt="Film 2 thumbnail" loading="lazy" />
+          <div class="overlay"><span>Play</span></div>
+        </div>
+        <h3>Surface</h3>
+        <p>1:46 • 2025</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Contact -->
+  <section class="section reveal" id="contact" aria-labelledby="contact-title">
+    <div class="section-head">
+      <h2 id="contact-title" class="fx-underline">Contact</h2>
+      <p>For collaborations and inquiries.</p>
+    </div>
+    <div class="contact-card">
+      <p>Email: <a href="mailto:your.email@example.com">your.email@example.com</a></p>
+      <p>Socials: <a href="#" rel="me">Instagram</a> • <a href="#" rel="me">Behance</a> • <a href="#" rel="me">YouTube</a></p>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <p>© 2025 VisualComm • <a href="index.html" data-vt>Entry</a></p>
   </footer>
+
+  <!-- Accessible modal/lightbox -->
+  <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-labelledby="lightbox-title" aria-describedby="lightbox-desc" hidden>
+    <div class="lightbox-backdrop" data-close></div>
+    <div class="lightbox-dialog" role="document">
+      <header class="lightbox-header">
+        <h2 id="lightbox-title">Preview</h2>
+        <button class="lightbox-close" type="button" aria-label="Close preview" data-close>&times;</button>
+      </header>
+      <div id="lightbox-desc" class="lightbox-body">
+        <!-- JS injects <img> or <video> here -->
+      </div>
+    </div>
+  </div>
+
+  <script src="js/portfolio.js" defer></script>
 </body>
 </html>
